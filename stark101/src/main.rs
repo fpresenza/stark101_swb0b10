@@ -1,6 +1,8 @@
 use lambdaworks_math::field::fields::u64_prime_field::U64FieldElement;
+use lambdaworks_math::polynomial::Polynomial;
 
 // modulus is 3221225473 = 3 * 2^30 + 1
+// construct associated prime field and field element types
 const MODULUS: u64 = 0b11000000000000000000000000000001;
 type FE = U64FieldElement<MODULUS>;
 
@@ -23,5 +25,13 @@ fn main() {
     }
 
     // define generator of evaluation domain (order 2^10)
+    // then construct evaluation domain
     let generator_eval_dom = FE::new(1855261384);
+    let eval_dom = (0..INT_DOM_SIZE).map(|i| generator_eval_dom.pow(i)).collect::<Vec<FE>>();
+    let trace_poly = match Polynomial::interpolate(&eval_dom, &fib_sq) {
+        Ok(poly) => poly,
+        Err(e) => panic!("{:?}", e),
+    };
+    println!("{:?}", trace_poly.evaluate(&FE::new(1)));
+    println!("{:?}", trace_poly.evaluate(&generator_eval_dom));
 }
