@@ -13,6 +13,7 @@ const INT_DOM_SIZE: usize = 0b10000000000;
 
 // evaluation domain of size 8192 = 2^13 (blow-up factor is 2^3)
 const EVAL_DOM_SIZE: usize = 0b10000000000000;
+const BLOWUP_FACTOR: usize = 0b1000;
 
 fn main() {
     // create vec to hold fibonacci square sequence
@@ -34,4 +35,17 @@ fn main() {
     assert_eq!(trace_poly.coefficients.len(), INT_DOM_SIZE);
     assert_eq!(trace_poly.evaluate(&FE::from(1 as u64)), FE::from(1 as u64));
     assert_eq!(trace_poly.evaluate(&F::get_primitive_root_of_unity(10 as u64).unwrap()), FE::from(3141592 as u64));
+
+    // fft-evaluate the fibonacci square sequence over a larger domain
+    // of size (blow-up factor) * (interpolation domain size)
+    // the offset is obtained as an outside not in the interpolation domain
+    let offset = FE::from(2 as u64);
+    assert!(offset.pow(INT_DOM_SIZE as u64) != FE::from(1 as u64));
+    let evaluations = match Polynomial::evaluate_offset_fft::<F>(
+        &trace_poly, BLOWUP_FACTOR, None, &offset
+    ) {
+        Ok(poly) => poly,
+        Err(e) => panic!("{:?}", e),
+    };
+    assert_eq!(evaluations.len(), EVAL_DOM_SIZE);
 }
