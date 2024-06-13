@@ -22,16 +22,12 @@ fn main() {
         let x = fib_sq[i-2];
         let y = fib_sq[i-1];
         fib_sq.push(x.pow(2_u64) + y.pow(2_u64));
-    }
+    } 
 
-    // define generator of evaluation domain (order 2^10)
-    // then construct evaluation domain
-    let generator_eval_dom = FE::from(1855261384 as u64);
-    let eval_dom = (0..INT_DOM_SIZE).map(|i| generator_eval_dom.pow(i)).collect::<Vec<FE>>();
-    let trace_poly = match Polynomial::interpolate(&eval_dom, &fib_sq) {
+    // fft-interpolate the fibonacci square sequence
+    let trace_poly = match Polynomial::interpolate_fft::<Stark252PrimeField>(&fib_sq) {
         Ok(poly) => poly,
         Err(e) => panic!("{:?}", e),
     };
-    println!("{:?}", trace_poly.evaluate(&FE::from(1 as u64)).representative());
-    println!("{:?}", trace_poly.evaluate(&generator_eval_dom).representative());
+    assert_eq!(trace_poly.coefficients.len(), INT_DOM_SIZE);
 }
