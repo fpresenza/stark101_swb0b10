@@ -2,6 +2,10 @@ use lambdaworks_math::field::traits::IsFFTField;
 use lambdaworks_math::field::fields::fft_friendly::stark_252_prime_field::Stark252PrimeField;
 use lambdaworks_math::field::element::FieldElement;
 use lambdaworks_math::polynomial::Polynomial;
+use lambdaworks_crypto::merkle_tree::{
+    merkle::MerkleTree,
+    backends::types::Sha3_256Backend
+};
 
 // the stark252 field has 2-adicity of 192, i.e., the largest
 // multiplicative subgroup whose order is a power of two has order 2^192
@@ -41,11 +45,14 @@ fn main() {
     // the offset is obtained as an outside not in the interpolation domain
     let offset = FE::from(2 as u64);
     assert!(offset.pow(INT_DOM_SIZE as u64) != FE::from(1 as u64));
-    let evaluations = match Polynomial::evaluate_offset_fft::<F>(
+    let trace_eval = match Polynomial::evaluate_offset_fft::<F>(
         &trace_poly, BLOWUP_FACTOR, None, &offset
     ) {
         Ok(poly) => poly,
         Err(e) => panic!("{:?}", e),
     };
-    assert_eq!(evaluations.len(), EVAL_DOM_SIZE);
+    assert_eq!(trace_eval.len(), EVAL_DOM_SIZE);
+
+    // commit to the trace evaluations over the larger domain using a merkle tree
+    let merkle_tree = MerkleTree::<Sha3_256Backend<F>>::build(&trace_eval);
 }
