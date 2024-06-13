@@ -29,10 +29,16 @@ impl Prover {
         // ==========|    Part 1:   |=========
         // === Statement, LDE & Commitment ===
         // ===================================
+        // define example parameters
+        let first_elem = FE::one();
+        let witness_elem = FE::from(3141592_u64);
+        let result_elem = FE::from_hex_unchecked("6A317721EF632FF24FB815C9BBD4D4582BC7E21A43CFBDD89A8B8F0BDA68252");
+        let int_dom_gen = F::get_primitive_root_of_unity(10_u64).unwrap();
+
         // create vec to hold fibonacci square sequence
         let mut fib_sq = Vec::<FE>::with_capacity(INT_DOM_SIZE);
-        fib_sq.push(FE::from(1_u64));
-        fib_sq.push(FE::from(3141592_u64));
+        fib_sq.push(first_elem);
+        fib_sq.push(witness_elem);
     
         for i in 2..INT_DOM_SIZE {
             let x = fib_sq[i-2];
@@ -45,20 +51,16 @@ impl Prover {
             Ok(poly) => poly,
             Err(e) => panic!("{:?}", e),
         };
-        let int_dom_gen = F::get_primitive_root_of_unity(10_u64).unwrap();
         assert_eq!(trace_poly.coefficients.len(), INT_DOM_SIZE);
-        assert_eq!(trace_poly.evaluate(&FE::from(1_u64)), FE::from(1_u64));
-        assert_eq!(trace_poly.evaluate(&int_dom_gen), FE::from(3141592_u64));
-        assert_eq!(
-            trace_poly.evaluate(&int_dom_gen.pow(1022_u64)),
-            FE::from_hex_unchecked("6A317721EF632FF24FB815C9BBD4D4582BC7E21A43CFBDD89A8B8F0BDA68252")
-        );
+        assert_eq!(trace_poly.evaluate(&FE::one()), first_elem);
+        assert_eq!(trace_poly.evaluate(&int_dom_gen), witness_elem);
+        assert_eq!(trace_poly.evaluate(&int_dom_gen.pow(1022_u64)), result_elem);
 
         // fft-evaluate the fibonacci square sequence over a larger domain
         // of size (blow-up factor) * (interpolation domain size)
         // the offset is obtained as an outside not in the interpolation domain
         let offset = FE::from(2_u64);
-        assert!(offset.pow(INT_DOM_SIZE as u64) != FE::from(1_u64));
+        assert!(offset.pow(INT_DOM_SIZE as u64) != FE::one());
         let trace_eval = match Polynomial::evaluate_offset_fft::<F>(
             &trace_poly, BLOWUP_FACTOR, None, &offset
         ) {
