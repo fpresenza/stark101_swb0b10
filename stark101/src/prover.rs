@@ -81,7 +81,7 @@ impl Prover {
         let initial_constraint_poly = polynomial_division_from_evaluation(
             &trace_poly - first_elem,
             Polynomial::new_monomial(FE::one(), 1) - FE::one(),
-            Some(INT_DOM_SIZE),
+            Some(EVAL_DOM_SIZE),
             &offset
         );
         assert_eq!(initial_constraint_poly.coefficients.len(), 1023);
@@ -90,7 +90,7 @@ impl Prover {
         let result_constraint_poly = polynomial_division_from_evaluation(
             &trace_poly - result_elem,
             Polynomial::new_monomial(FE::one(), 1) - int_dom_gen_1022,
-            Some(INT_DOM_SIZE),
+            Some(EVAL_DOM_SIZE),
             &offset
         );
         assert_eq!(result_constraint_poly.coefficients.len(), 1023);
