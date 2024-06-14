@@ -34,7 +34,8 @@ impl Prover {
         let witness_elem = FE::from(3141592_u64);
         let result_elem = FE::from_hex_unchecked("6A317721EF632FF24FB815C9BBD4D4582BC7E21A43CFBDD89A8B8F0BDA68252");
         let int_dom_gen = F::get_primitive_root_of_unity(10_u64).unwrap();
-
+        let int_dom_gen_1022 = int_dom_gen.pow(1022_u64);
+        
         // create vec to hold fibonacci square sequence
         let mut fib_sq = Vec::<FE>::with_capacity(INT_DOM_SIZE);
         fib_sq.push(first_elem);
@@ -54,7 +55,7 @@ impl Prover {
         assert_eq!(trace_poly.coefficients.len(), INT_DOM_SIZE);
         assert_eq!(trace_poly.evaluate(&FE::one()), first_elem);
         assert_eq!(trace_poly.evaluate(&int_dom_gen), witness_elem);
-        assert_eq!(trace_poly.evaluate(&int_dom_gen.pow(1022_u64)), result_elem);
+        assert_eq!(trace_poly.evaluate(&int_dom_gen_1022), result_elem);
 
         // fft-evaluate the fibonacci square sequence over a larger domain
         // of size (blow-up factor) * (interpolation domain size)
@@ -71,6 +72,55 @@ impl Prover {
     
         // commit to the trace evaluations over the larger domain using a merkle tree
         let merkle_tree = MerkleTree::<Sha3_256Backend<F>>::build(&trace_eval);
+
+        // ===================================
+        // =========|    Part 2:   |==========
+        // ===== Polynomial Constraints ======
+        // ===================================
+        // initial element constraint
+        let initial_constraint_poly = polynomial_division_from_evaluation(
+            &trace_poly - first_elem,
+            Polynomial::new_monomial(FE::one(), 1) - FE::one(),
+            Some(INT_DOM_SIZE),
+            &offset
+        );
+        assert_eq!(initial_constraint_poly.coefficients.len(), 1023);
+
+        // result element constraint
+        let result_constraint_poly = polynomial_division_from_evaluation(
+            &trace_poly - result_elem,
+            Polynomial::new_monomial(FE::one(), 1) - int_dom_gen_1022,
+            Some(INT_DOM_SIZE),
+            &offset
+        );
+        assert_eq!(result_constraint_poly.coefficients.len(), 1023);
     }
+
+}
+
+
+fn polynomial_division_from_evaluation(
+        num: Polynomial<FieldElement<F>>,
+        den: Polynomial<FieldElement<F>>,
+        domain_size: Option<usize>,
+        offset: &FieldElement<F>
+    ) -> Polynomial<FieldElement<F>> {
+    let num_eval = Polynomial::evaluate_offset_fft::<F>(
+            &num, 1, domain_size, &offset
+    ).unwrap();
+
+    let den_eval = Polynomial::evaluate_offset_fft::<F>(
+        &den, 1, domain_size, &offset
+    ).unwrap();
+
+    let poly_eval: Vec<_> = num_eval
+        .iter()
+        .zip(den_eval.iter())
+        .map(|(n, d)| n / d)
+        .collect();
+    
+    Polynomial::interpolate_fft::<F>(
+        &poly_eval
+    ).unwrap()
 
 }
