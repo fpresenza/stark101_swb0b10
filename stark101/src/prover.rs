@@ -30,7 +30,8 @@ impl Prover {
         // === Statement, LDE & Commitment ===
         // ===================================
         // define example parameters
-        let first_elem = FE::one();
+        let one = FE::one();
+        let first_elem = one;
         let witness_elem = FE::from(3141592_u64);
         let result_elem = FE::from_hex_unchecked("6A317721EF632FF24FB815C9BBD4D4582BC7E21A43CFBDD89A8B8F0BDA68252");
         let int_dom_gen = F::get_primitive_root_of_unity(10_u64).unwrap();
@@ -53,7 +54,7 @@ impl Prover {
             Err(e) => panic!("{:?}", e),
         };
         assert_eq!(trace_poly.coefficients.len(), INT_DOM_SIZE);
-        assert_eq!(trace_poly.evaluate(&FE::one()), first_elem);
+        assert_eq!(trace_poly.evaluate(&one), first_elem);
         assert_eq!(trace_poly.evaluate(&int_dom_gen), witness_elem);
         assert_eq!(trace_poly.evaluate(&int_dom_gen_1022), result_elem);
 
@@ -61,7 +62,7 @@ impl Prover {
         // of size (blow-up factor) * (interpolation domain size)
         // the offset is obtained as an outside not in the interpolation domain
         let offset = FE::from(2_u64);
-        assert!(offset.pow(INT_DOM_SIZE as u64) != FE::one());
+        assert!(offset.pow(INT_DOM_SIZE as u64) != one);
         let trace_eval = match Polynomial::evaluate_offset_fft::<F>(
             &trace_poly, BLOWUP_FACTOR, None, &offset
         ) {
@@ -77,10 +78,11 @@ impl Prover {
         // =========|    Part 2:   |==========
         // ===== Polynomial Constraints ======
         // ===================================
+        let x = Polynomial::new_monomial(one, 1);
         // initial element constraint
         let initial_constraint_poly = polynomial_division_from_evaluation(
             &trace_poly - first_elem,
-            Polynomial::new_monomial(FE::one(), 1) - FE::one(),
+            &x - one,
             Some(EVAL_DOM_SIZE),
             &offset
         );
@@ -89,7 +91,7 @@ impl Prover {
         // result element constraint
         let result_constraint_poly = polynomial_division_from_evaluation(
             &trace_poly - result_elem,
-            Polynomial::new_monomial(FE::one(), 1) - int_dom_gen_1022,
+            &x - int_dom_gen_1022,
             Some(EVAL_DOM_SIZE),
             &offset
         );
@@ -106,7 +108,7 @@ fn polynomial_division_from_evaluation(
         offset: &FieldElement<F>
     ) -> Polynomial<FieldElement<F>> {
     let num_eval = Polynomial::evaluate_offset_fft::<F>(
-            &num, 1, domain_size, &offset
+        &num, 1, domain_size, &offset
     ).unwrap();
 
     let den_eval = Polynomial::evaluate_offset_fft::<F>(
