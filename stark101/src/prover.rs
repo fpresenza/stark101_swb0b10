@@ -80,7 +80,7 @@ pub fn generate_proof() {
     let initial_constraint_poly = polynomial_division_from_evaluation(
         &trace_poly - first_elem,
         &x - one,
-        Some(EVAL_DOM_SIZE),
+        EVAL_DOM_SIZE,
         &offset
     );
     assert_eq!(initial_constraint_poly.coefficients.len(), 1023);
@@ -89,7 +89,7 @@ pub fn generate_proof() {
     let result_constraint_poly = polynomial_division_from_evaluation(
         &trace_poly - result_elem,
         &x - int_dom_gen_1022,
-        Some(EVAL_DOM_SIZE),
+        EVAL_DOM_SIZE,
         &offset
     );
     assert_eq!(result_constraint_poly.coefficients.len(), 1023);
@@ -99,15 +99,15 @@ pub fn generate_proof() {
 fn polynomial_division_from_evaluation(
         num: Polynomial<FieldElement<F>>,
         den: Polynomial<FieldElement<F>>,
-        domain_size: Option<usize>,
+        domain_size: usize,
         offset: &FieldElement<F>
     ) -> Polynomial<FieldElement<F>> {
     let num_eval = Polynomial::evaluate_offset_fft::<F>(
-        &num, 1, domain_size, offset
+        &num, 1, Some(domain_size), offset
     ).unwrap();
 
     let den_eval = Polynomial::evaluate_offset_fft::<F>(
-        &den, 1, domain_size, offset
+        &den, 1, Some(domain_size), offset
     ).unwrap();
 
     let poly_eval = num_eval
