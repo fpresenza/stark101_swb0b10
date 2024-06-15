@@ -31,29 +31,31 @@ pub fn generate_proof() {
     let first_elem = one;
     let witness_elem = FE::from(3141592_u64);
     let result_elem = FE::from_hex_unchecked("6A317721EF632FF24FB815C9BBD4D4582BC7E21A43CFBDD89A8B8F0BDA68252");
-    let int_dom_gen = F::get_primitive_root_of_unity(10_u64).unwrap();
-    let int_dom_gen_1022 = int_dom_gen.pow(1022_u64);
-    
+    let g = F::get_primitive_root_of_unity(10_u64).unwrap();
+    let g_to_the_1021 = g.pow(1021_u64);
+    let g_to_the_1022 = g * g_to_the_1021;
+    let g_to_the_1023 = g * g_to_the_1022;
+
     // create vec to hold fibonacci square sequence
-    let mut fib_sq = Vec::<FE>::with_capacity(INT_DOM_SIZE);
-    fib_sq.push(first_elem);
-    fib_sq.push(witness_elem);
+    let mut fib_squared = Vec::<FE>::with_capacity(INT_DOM_SIZE);
+    fib_squared.push(first_elem);
+    fib_squared.push(witness_elem);
 
     for i in 2..INT_DOM_SIZE {
-        let x = fib_sq[i-2];
-        let y = fib_sq[i-1];
-        fib_sq.push(x.pow(2_u64) + y.pow(2_u64));
+        let x = fib_squared[i-2];
+        let y = fib_squared[i-1];
+        fib_squared.push(x.pow(2_u64) + y.pow(2_u64));
     }
 
     // fft-interpolate the fibonacci square sequence
-    let trace_poly = match Polynomial::interpolate_fft::<F>(&fib_sq) {
+    let trace_poly = match Polynomial::interpolate_fft::<F>(&fib_squared) {
         Ok(poly) => poly,
         Err(e) => panic!("{:?}", e),
     };
     assert_eq!(trace_poly.coefficients.len(), INT_DOM_SIZE);
     assert_eq!(trace_poly.evaluate(&one), first_elem);
-    assert_eq!(trace_poly.evaluate(&int_dom_gen), witness_elem);
-    assert_eq!(trace_poly.evaluate(&int_dom_gen_1022), result_elem);
+    assert_eq!(trace_poly.evaluate(&g), witness_elem);
+    assert_eq!(trace_poly.evaluate(&g_to_the_1022), result_elem);
 
     // fft-evaluate the fibonacci square sequence over a larger domain
     // of size (blow-up factor) * (interpolation domain size)
@@ -75,42 +77,87 @@ pub fn generate_proof() {
     // ===== Polynomial Constraints ======
     // ===================================
     let x = Polynomial::new_monomial(one, 1);
+    let x_to_the_1024 = Polynomial::new_monomial(one, 1024);
 
     // initial element constraint
     let initial_constraint_poly = polynomial_division(
-        &trace_poly - first_elem,
-        &x - one,
+        &(&trace_poly - first_elem),
+        &(&x - one),
         EVAL_DOM_SIZE,
         &offset
     );
-    assert_eq!(initial_constraint_poly.coefficients.len(), 1023);
+    assert_eq!(initial_constraint_poly.coefficients.len(), INT_DOM_SIZE - 1);
 
     // result element constraint
     let result_constraint_poly = polynomial_division(
-        &trace_poly - result_elem,
-        &x - int_dom_gen_1022,
+        &(&trace_poly - result_elem),
+        &(&x - g_to_the_1022),
         EVAL_DOM_SIZE,
         &offset
     );
-    assert_eq!(result_constraint_poly.coefficients.len(), 1023);
+    assert_eq!(result_constraint_poly.coefficients.len(), INT_DOM_SIZE - 1);
+
+    // trace transition constraint
+    // numerator
+    let trace_poly_scaled_once = trace_poly.scale(&g);
+    let trace_poly_scaled_twice = trace_poly_scaled_once.scale(&g);
+    let trace_poly_squared = polynomial_power(
+        &trace_poly,
+        2_u64,
+        EVAL_DOM_SIZE,
+        &offset
+    );
+    let trace_poly_scaled_once_squared = polynomial_power(
+        &trace_poly_scaled_once,
+        2_u64,
+        EVAL_DOM_SIZE,
+        &offset
+    );
+    assert!(trace_poly_squared.coefficients.len() <= 2 * INT_DOM_SIZE);
+    assert!(trace_poly_scaled_once_squared.coefficients.len() <= 2 * INT_DOM_SIZE);
+    assert_eq!(
+        trace_poly_scaled_twice.evaluate(&g_to_the_1021),
+        trace_poly_scaled_once_squared.evaluate(&g_to_the_1021) + trace_poly_squared.evaluate(&g_to_the_1021)
+    );
+
+    let numerator = polynomial_multiplication(
+        &[
+            &(trace_poly_scaled_twice - trace_poly_scaled_once_squared - trace_poly_squared),
+            &(&x - g_to_the_1021), 
+            &(&x - g_to_the_1022),
+            &(&x - g_to_the_1023)
+        ],
+        EVAL_DOM_SIZE,
+        &offset
+    );
+
+    // denominator
+    let denominator = &x_to_the_1024 - one;
+    let transition_constraint_poly = polynomial_division(
+        &numerator,
+        &denominator,
+        EVAL_DOM_SIZE,
+        &offset
+    );
+    assert!(transition_constraint_poly.coefficients.len() <= 2 * INT_DOM_SIZE);
 }
 
 // permforms polynomial division in evaluation form.
 // the obtained polynomial is the actual division if and
 // only if the division remainer is zero
 fn polynomial_division(
-        num: Polynomial<FieldElement<F>>,
-        den: Polynomial<FieldElement<F>>,
+        num: &Polynomial<FieldElement<F>>,
+        den: &Polynomial<FieldElement<F>>,
         domain_size: usize,
         offset: &FieldElement<F>
     ) -> Polynomial<FieldElement<F>> {
 
     let num_eval = Polynomial::evaluate_offset_fft::<F>(
-        &num, 1, Some(domain_size), offset
+        num, 1, Some(domain_size), offset
     ).unwrap();
 
     let den_eval = Polynomial::evaluate_offset_fft::<F>(
-        &den, 1, Some(domain_size), offset
+        den, 1, Some(domain_size), offset
     ).unwrap();
 
     let poly_eval = num_eval
@@ -121,5 +168,60 @@ fn polynomial_division(
     
     Polynomial::interpolate_offset_fft::<F>(
         &poly_eval, offset
+    ).unwrap()
+
+}
+
+// permforms polynomial multiplication in evaluation form.
+fn polynomial_multiplication(
+        factors: &[&Polynomial<FieldElement<F>>],
+        domain_size: usize,
+        offset: &FieldElement<F>
+    ) -> Polynomial<FieldElement<F>> {
+
+    let mut product_eval = Polynomial::evaluate_offset_fft::<F>(
+        &factors[0], 1, Some(domain_size), offset
+    ).unwrap();
+
+    for i in 1..factors.len() {
+        let evaluations = Polynomial::evaluate_offset_fft::<F>(
+            &factors[i], 1, Some(domain_size), offset
+        ).unwrap();
+        product_eval = product_eval
+            .iter()
+            .zip(evaluations)
+            .map(|(prod, eval)| prod * eval)
+            .collect::<Vec<FieldElement<F>>>();
+    }
+
+    Polynomial::interpolate_offset_fft::<F>(
+        &product_eval, offset
+    ).unwrap()
+}
+
+// permforms polynomial power in evaluation form.
+fn polynomial_power(
+        poly: &Polynomial<FieldElement<F>>,
+        power: u64,
+        domain_size: usize,
+        offset: &FieldElement<F>
+    ) -> Polynomial<FieldElement<F>> {
+
+    let evaluations = Polynomial::evaluate_offset_fft::<F>(
+        &poly, 1, Some(domain_size), offset
+    ).unwrap();
+
+    let mut power_eval = evaluations.clone();
+
+    for _ in 1..power {
+        power_eval = power_eval
+            .iter()
+            .zip(&evaluations)
+            .map(|(pow, eval)| pow * eval)
+            .collect::<Vec<FieldElement<F>>>();
+    }
+
+    Polynomial::interpolate_offset_fft::<F>(
+        &power_eval, offset
     ).unwrap()
 }
