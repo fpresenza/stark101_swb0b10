@@ -1,5 +1,5 @@
 mod prover;
 
 fn main() {
-    prover::Prover::generate_proof();
+    prover::generate_proof();
 }
