@@ -77,7 +77,7 @@ pub fn generate_proof() {
     let x = Polynomial::new_monomial(one, 1);
 
     // initial element constraint
-    let initial_constraint_poly = polynomial_division_from_evaluation(
+    let initial_constraint_poly = polynomial_division(
         &trace_poly - first_elem,
         &x - one,
         EVAL_DOM_SIZE,
@@ -86,7 +86,7 @@ pub fn generate_proof() {
     assert_eq!(initial_constraint_poly.coefficients.len(), 1023);
 
     // result element constraint
-    let result_constraint_poly = polynomial_division_from_evaluation(
+    let result_constraint_poly = polynomial_division(
         &trace_poly - result_elem,
         &x - int_dom_gen_1022,
         EVAL_DOM_SIZE,
@@ -95,13 +95,16 @@ pub fn generate_proof() {
     assert_eq!(result_constraint_poly.coefficients.len(), 1023);
 }
 
-
-fn polynomial_division_from_evaluation(
+// permforms polynomial division in evaluation form.
+// the obtained polynomial is the actual division if and
+// only if the division remainer is zero
+fn polynomial_division(
         num: Polynomial<FieldElement<F>>,
         den: Polynomial<FieldElement<F>>,
         domain_size: usize,
         offset: &FieldElement<F>
     ) -> Polynomial<FieldElement<F>> {
+
     let num_eval = Polynomial::evaluate_offset_fft::<F>(
         &num, 1, Some(domain_size), offset
     ).unwrap();
@@ -116,8 +119,7 @@ fn polynomial_division_from_evaluation(
         .map(|(n, d)| n / d)
         .collect::<Vec<FieldElement<F>>>();
     
-    Polynomial::interpolate_fft::<F>(
-        &poly_eval
+    Polynomial::interpolate_offset_fft::<F>(
+        &poly_eval, offset
     ).unwrap()
-
 }
