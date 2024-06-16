@@ -4,7 +4,7 @@ use lambdaworks_math::field::{
 };
 use lambdaworks_math::polynomial::Polynomial;
 
-// permforms polynomial division in evaluation form.
+// performs polynomial division in evaluation form.
 // the obtained polynomial is the actual division if and
 // only if the division remainer is zero
 pub fn polynomial_division<F: IsField + IsFFTField>(
@@ -33,7 +33,10 @@ pub fn polynomial_division<F: IsField + IsFFTField>(
     ).unwrap()
 }
 
-// permforms polynomial multiplication in evaluation form.
+// performs polynomial multiplication in evaluation form.
+// the obtained polynomial is the actual multiplication if
+// and only if the degree of the multiplication fits in the
+// domain size
 pub fn polynomial_multiplication<F: IsField + IsFFTField>(
         factors: &[&Polynomial<FieldElement<F>>],
         domain_size: usize,
@@ -60,7 +63,10 @@ pub fn polynomial_multiplication<F: IsField + IsFFTField>(
     ).unwrap()
 }
 
-// permforms polynomial power in evaluation form.
+// performs polynomial power in evaluation form.
+// the obtained polynomial is the actual power if
+// and only if the degree of the power fits in the
+// domain size
 pub fn polynomial_power<F: IsField + IsFFTField>(
         poly: &Polynomial<FieldElement<F>>,
         power: u64,
@@ -72,15 +78,10 @@ pub fn polynomial_power<F: IsField + IsFFTField>(
         &poly, 1, Some(domain_size), offset
     ).unwrap();
 
-    let mut power_eval = evaluations.clone();
-
-    for _ in 1..power {
-        power_eval = power_eval
+    let power_eval = evaluations
             .iter()
-            .zip(&evaluations)
-            .map(|(pow, eval)| pow * eval)
+            .map(|eval| eval.pow(power))
             .collect::<Vec<FieldElement<F>>>();
-    }
 
     Polynomial::interpolate_offset_fft::<F>(
         &power_eval, offset
