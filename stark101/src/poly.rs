@@ -44,12 +44,12 @@ pub fn polynomial_multiplication<F: IsField + IsFFTField>(
     ) -> Polynomial<FieldElement<F>> {
 
     let mut product_eval = Polynomial::evaluate_offset_fft::<F>(
-        &factors[0], 1, Some(domain_size), offset
+        factors[0], 1, Some(domain_size), offset
     ).unwrap();
 
-    for i in 1..factors.len() {
+    for factor in factors.iter().skip(1) {
         let evaluations = Polynomial::evaluate_offset_fft::<F>(
-            &factors[i], 1, Some(domain_size), offset
+            factor, 1, Some(domain_size), offset
         ).unwrap();
         product_eval = product_eval
             .iter()
@@ -75,7 +75,7 @@ pub fn polynomial_power<F: IsField + IsFFTField>(
     ) -> Polynomial<FieldElement<F>> {
 
     let evaluations = Polynomial::evaluate_offset_fft::<F>(
-        &poly, 1, Some(domain_size), offset
+        poly, 1, Some(domain_size), offset
     ).unwrap();
 
     let power_eval = evaluations
