@@ -33,6 +33,7 @@ pub fn generate_proof(public_input: (U256, usize, usize, FE, FE, FE)) {
     // ===================================
     // extract public input
     let (modulus, int_dom_size, eval_dom_size, g, fib_squared_0, fib_squared_1022) = public_input;
+
     // define example parameters
     let one = FE::one();
     let witness = FE::from(3141592_u64);
@@ -159,4 +160,20 @@ pub fn generate_proof(public_input: (U256, usize, usize, FE, FE, FE)) {
         &offset
     );
     assert!(transition_constraint_poly.coefficients.len() <= 2 * int_dom_size);
+
+    // composition polynomial
+    let a = transcript.sample_field_element();
+    let b = transcript.sample_field_element();
+    let c = transcript.sample_field_element();
+    let comp_poly = a * initial_constraint_poly + b * result_constraint_poly + c * transition_constraint_poly;
+    let comp_eval = match Polynomial::evaluate_offset_fft::<F>(
+        &comp_poly, 1, Some(eval_dom_size), &offset
+    ) {
+        Ok(p) => p,
+        Err(e) => panic!("{:?}", e),
+    };
+    // println!("cp degree {:?}", comp_poly.coefficients.len());
+    let comp_poly_merkle_tree = MerkleTree::<Keccak256Backend<F>>::build(&comp_eval);
+    transcript.append_bytes(&comp_poly_merkle_tree.root);
+    // println!("{:?}", comp_poly_merkle_tree.root);
 }

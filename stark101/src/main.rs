@@ -44,6 +44,5 @@ fn main() {
         fib_squared_1022,
     );
 
-
     prover::generate_proof(public_input.clone());
 }
