@@ -1,3 +1,4 @@
+use lambdaworks_math::traits::ByteConversion;
 use lambdaworks_math::unsigned_integer::element::U256;
 use lambdaworks_math::field::{
     fields::fft_friendly::stark_252_prime_field::{
@@ -11,6 +12,10 @@ use lambdaworks_crypto::{
         merkle::MerkleTree,
         backends::types::Keccak256Backend
     },
+    fiat_shamir::{
+        is_transcript::IsTranscript,
+        default_transcript::DefaultTranscript
+    }
 };
 
 use stark101::poly;
@@ -36,6 +41,16 @@ pub fn generate_proof(public_input: (U256, usize, usize, FE, FE, FE)) {
     let g_to_the_1021 = g.pow(1021_u64);
     let g_to_the_1022 = g * g_to_the_1021;
     let g_to_the_1023 = g * g_to_the_1022;
+
+    // initialize transcript
+    let mut transcript = DefaultTranscript::<F>::new(&[]);
+    transcript.append_bytes(&modulus.to_bytes_be());
+    transcript.append_bytes(&int_dom_size.to_be_bytes());
+    transcript.append_bytes(&eval_dom_size.to_be_bytes());
+    transcript.append_bytes(&g.to_bytes_be());
+    transcript.append_bytes(&fib_squared_0.to_bytes_be());
+    transcript.append_bytes(&fib_squared_1022.to_bytes_be());
+    // println!("{:?}", transcript.state());
 
     // create vec to hold fibonacci square sequence
     let mut fib_squared = Vec::<FE>::with_capacity(int_dom_size);
@@ -73,6 +88,7 @@ pub fn generate_proof(public_input: (U256, usize, usize, FE, FE, FE)) {
 
     // commit to the trace evaluations over the larger domain using a merkle tree
     let trace_poly_merkle_tree = MerkleTree::<Keccak256Backend<F>>::build(&trace_eval);
+    transcript.append_bytes(&trace_poly_merkle_tree.root);
     // println!("{:?}", trace_poly_merkle_tree.root);
 
     // ===================================
