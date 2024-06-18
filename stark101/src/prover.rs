@@ -1,9 +1,8 @@
 use lambdaworks_math::traits::ByteConversion;
 use lambdaworks_math::unsigned_integer::element::U256;
 use lambdaworks_math::field::{
-    fields::fft_friendly::stark_252_prime_field::{
-        Stark252PrimeField
-    },
+    traits::IsFFTField,
+    fields::fft_friendly::stark_252_prime_field::Stark252PrimeField,
     element::FieldElement
 };
 use lambdaworks_math::polynomial::Polynomial;
@@ -26,19 +25,20 @@ type F = Stark252PrimeField;
 type FE = FieldElement<F>;
 
 
-pub fn generate_proof(public_input: (U256, usize, usize, FE, FE, FE)) {
+pub fn generate_proof(public_input: (U256, usize, usize, FE, FE)) {
     // ===================================
     // ==========|    Part 1:   |=========
     // === Statement, LDE & Commitment ===
     // ===================================
     // extract public input
-    let (modulus, int_dom_size, eval_dom_size, g, fib_squared_0, fib_squared_1022) = public_input;
+    let (modulus, int_dom_size, eval_dom_size, fib_squared_0, fib_squared_1022) = public_input;
 
     // define example parameters
     let one = FE::one();
     let witness = FE::from(3141592_u64);
 
-    // define primite root
+    // define primitive root
+    let g = F::get_primitive_root_of_unity(10).unwrap();
     let g_to_the_1021 = g.pow(1021_u64);
     let g_to_the_1022 = g * g_to_the_1021;
     let g_to_the_1023 = g * g_to_the_1022;

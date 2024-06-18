@@ -2,7 +2,7 @@ use lambdaworks_math::field::{
     element::FieldElement,
     traits::{IsField, IsFFTField}
 };
-use lambdaworks_math::polynomial::Polynomial;
+use lambdaworks_math::polynomial::{self, Polynomial};
 
 // performs polynomial division in evaluation form.
 // the obtained polynomial is the actual division if and
@@ -86,4 +86,35 @@ pub fn polynomial_power<F: IsField + IsFFTField>(
     Polynomial::interpolate_offset_fft::<F>(
         &power_eval, offset
     ).unwrap()
+}
+
+// performs polynomial folding into a new polynomial of degree
+// less or equal than half the degree of the original one
+pub fn fold_polynomial<F>(
+    poly: &Polynomial<FieldElement<F>>,
+    beta: &FieldElement<F>,
+) -> Polynomial<FieldElement<F>>
+where
+    F: IsField,
+{
+    let coef = poly.coefficients();
+    let even_coef: Vec<FieldElement<F>> = coef
+        .iter()
+        .step_by(2)
+        .cloned()
+        .collect();
+
+    // odd coeficients of poly are multiplied by beta
+    let odd_coef_mul_beta: Vec<FieldElement<F>> = coef
+        .iter()
+        .skip(1)
+        .step_by(2)
+        .map(|v| (v.clone()) * beta)
+        .collect();
+
+    let (even_poly, odd_poly) = polynomial::pad_with_zero_coefficients(
+        &Polynomial::new(&even_coef),
+        &Polynomial::new(&odd_coef_mul_beta),
+    );
+    even_poly + odd_poly
 }

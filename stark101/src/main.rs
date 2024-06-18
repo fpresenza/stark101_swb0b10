@@ -1,5 +1,4 @@
 use lambdaworks_math::field::{
-    traits::IsFFTField,
     fields::montgomery_backed_prime_fields::IsModulus,
     fields::fft_friendly::stark_252_prime_field::{
         Stark252PrimeField,
@@ -19,7 +18,6 @@ type FE = FieldElement<F>;
 
 // interpolation domain of size 1024 = 2^10
 const INT_DOM_SIZE: usize = 0b10000000000;
-const INT_DOM_SIZE_LOG2: u64 = 10;
 // evaluation domain of size 8192 = 2^13 (blow-up factor is 2^3)
 const EVAL_DOM_SIZE: usize = 0b10000000000000;
 
@@ -29,7 +27,6 @@ fn main() {
     // public input //
     // field properties
     let modulus = FConfig::MODULUS;
-    let g = F::get_primitive_root_of_unity(INT_DOM_SIZE_LOG2).unwrap();
 
     // trace properties
     let fib_squared_0 = FE::one();
@@ -39,7 +36,6 @@ fn main() {
         modulus,
         INT_DOM_SIZE,
         EVAL_DOM_SIZE,
-        g,
         fib_squared_0,
         fib_squared_1022,
     );
