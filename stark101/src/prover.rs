@@ -69,7 +69,7 @@ pub fn generate_proof(public_input: (U256, usize, usize, FE, FE, FE)) {
         Ok(p) => p,
         Err(e) => panic!("{:?}", e),
     };
-    assert_eq!(trace_poly.coefficients.len(), int_dom_size);
+    assert_eq!(trace_poly.degree(), int_dom_size - 1);
     assert_eq!(trace_poly.evaluate(&one), fib_squared_0);
     assert_eq!(trace_poly.evaluate(&g), witness);
     assert_eq!(trace_poly.evaluate(&g_to_the_1022), fib_squared_1022);
@@ -85,7 +85,6 @@ pub fn generate_proof(public_input: (U256, usize, usize, FE, FE, FE)) {
         Ok(p) => p,
         Err(e) => panic!("{:?}", e),
     };
-    assert_eq!(trace_eval.len(), eval_dom_size);
 
     // commit to the trace evaluations over the larger domain using a merkle tree
     let trace_poly_merkle_tree = MerkleTree::<Keccak256Backend<F>>::build(&trace_eval);
@@ -100,22 +99,22 @@ pub fn generate_proof(public_input: (U256, usize, usize, FE, FE, FE)) {
     let x_to_the_1024 = Polynomial::new_monomial(one, int_dom_size);
 
     // initial element constraint
-    let initial_constraint_poly = poly::polynomial_division(
+    let contraint_0_poly_poly = poly::polynomial_division(
         &(&trace_poly - fib_squared_0),
         &(&x - one),
         eval_dom_size,
         &offset
     );
-    assert_eq!(initial_constraint_poly.coefficients.len(), int_dom_size - 1);
+    assert_eq!(contraint_0_poly_poly.degree(), int_dom_size - 2);
 
     // result element constraint
-    let result_constraint_poly = poly::polynomial_division(
+    let contraint_1022_poly = poly::polynomial_division(
         &(&trace_poly - fib_squared_1022),
         &(&x - g_to_the_1022),
         eval_dom_size,
         &offset
     );
-    assert_eq!(result_constraint_poly.coefficients.len(), int_dom_size - 1);
+    assert_eq!(contraint_1022_poly.degree(), int_dom_size - 2);
 
     // trace transition constraint
     // numerator
@@ -133,8 +132,8 @@ pub fn generate_proof(public_input: (U256, usize, usize, FE, FE, FE)) {
         eval_dom_size,
         &offset
     );
-    assert!(trace_poly_squared.coefficients.len() <= 2 * int_dom_size);
-    assert!(trace_poly_scaled_once_squared.coefficients.len() <= 2 * int_dom_size);
+    assert_eq!(trace_poly_squared.degree(), 2 * int_dom_size - 2);
+    assert_eq!(trace_poly_scaled_once_squared.degree(), 2 * int_dom_size - 2);
     assert_eq!(
         trace_poly_scaled_twice.evaluate(&g_to_the_1021),
         trace_poly_scaled_once_squared.evaluate(&g_to_the_1021) + trace_poly_squared.evaluate(&g_to_the_1021)
@@ -159,20 +158,21 @@ pub fn generate_proof(public_input: (U256, usize, usize, FE, FE, FE)) {
         eval_dom_size,
         &offset
     );
-    assert!(transition_constraint_poly.coefficients.len() <= 2 * int_dom_size);
+    assert_eq!(transition_constraint_poly.degree(), int_dom_size + 1);
 
     // composition polynomial
     let a = transcript.sample_field_element();
     let b = transcript.sample_field_element();
     let c = transcript.sample_field_element();
-    let comp_poly = a * initial_constraint_poly + b * result_constraint_poly + c * transition_constraint_poly;
+    let comp_poly = a * contraint_0_poly_poly + b * contraint_1022_poly + c * transition_constraint_poly;
+    assert_eq!(comp_poly.degree(), int_dom_size + 1);
+
     let comp_eval = match Polynomial::evaluate_offset_fft::<F>(
         &comp_poly, 1, Some(eval_dom_size), &offset
     ) {
         Ok(p) => p,
         Err(e) => panic!("{:?}", e),
     };
-    // println!("cp degree {:?}", comp_poly.coefficients.len());
     let comp_poly_merkle_tree = MerkleTree::<Keccak256Backend<F>>::build(&comp_eval);
     transcript.append_bytes(&comp_poly_merkle_tree.root);
     // println!("{:?}", comp_poly_merkle_tree.root);
