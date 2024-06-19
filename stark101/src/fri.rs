@@ -6,7 +6,8 @@ use lambdaworks_math::field::{
 use lambdaworks_math::polynomial::Polynomial;
 use lambdaworks_crypto::merkle_tree::{
     merkle::MerkleTree,
-    backends::types::Keccak256Backend
+    backends::types::Keccak256Backend, 
+    proof::Proof
 };
 use lambdaworks_crypto::fiat_shamir::{
     is_transcript::IsTranscript,
@@ -15,16 +16,24 @@ use lambdaworks_crypto::fiat_shamir::{
 
 use crate::poly;
 
-pub struct FriLayer {
+pub struct FriLayer<F: IsField> {
     merkle_root: [u8; 32],
+    query_value: FieldElement<F>,
+    // query_merkle_proof,
+    query_sym_value: FieldElement<F>,
+    // query_sym_merkle_proof,
 }
 
-impl FriLayer {
+impl<F: IsField> FriLayer<F> {
     fn new(
         merkle_root: [u8; 32],
+        query_value: FieldElement<F>,
+        query_sym_value: FieldElement<F>,
     ) -> Self {
         Self {
             merkle_root,
+            query_value,
+            query_sym_value
         }
     }
 }
@@ -34,29 +43,24 @@ pub fn commit_and_fold<F>(
         mut domain_size: usize,
         offset: &FieldElement<F>,
         transcript: &mut DefaultTranscript<F>
-    ) -> (Vec<FriLayer>, FieldElement<F>)
+    ) -> (Vec<FriLayer<F>>, FieldElement<F>)
     where
         F: IsField + IsFFTField,
         FieldElement<F>: AsBytes + ByteConversion,
         <F as IsField>::BaseType: Sync + Send,
     {
-        let mut curr_poly = polynomial.clone();
-        let mut curr_offset = offset.clone();
-        let number_of_layers = (usize::BITS - curr_poly.degree().leading_zeros() + 1) as usize;
-        let mut fri_layers = Vec::<FriLayer>::with_capacity(number_of_layers);
+        let mut polynomial = polynomial.clone();
+        let mut offset = offset.clone();
+        let number_of_layers = (usize::BITS - polynomial.degree().leading_zeros() + 1) as usize;
+        let mut fri_layers = Vec::<FriLayer<F>>::with_capacity(number_of_layers);
 
         // before first folding
-        let curr_eval = Polynomial::evaluate_offset_fft::<F>(
-            &curr_poly,
-            1,
-            Some(domain_size),
-            &curr_offset
-        ).unwrap();
-        let merkle_tree = MerkleTree::<Keccak256Backend<F>>::build(&curr_eval);
-        transcript.append_bytes(&merkle_tree.root);
+        let root = commit(&polynomial, domain_size, &offset, transcript);
         fri_layers.push(
-            FriLayer::new(
-                merkle_tree.root,
+            FriLayer::<F>::new(
+                root,
+                FieldElement::<F>::from(0_u64),
+                FieldElement::<F>::from(0_u64),
             )
         );
     
@@ -64,23 +68,46 @@ pub fn commit_and_fold<F>(
         for _ in 1..number_of_layers {
             let beta = transcript.sample_field_element();
     
-            curr_poly = poly::fold_polynomial(&curr_poly, &beta);
+            polynomial = poly::fold_polynomial(&polynomial, &beta);
             domain_size /= 2;
-            curr_offset = curr_offset.square();
-    
-            let curr_eval = Polynomial::evaluate_offset_fft::<F>(
-                &curr_poly,
-                1, 
-                Some(domain_size),
-                &curr_offset
-            ).unwrap();
-    
-            let curr_merkle_tree = MerkleTree::<Keccak256Backend<F>>::build(&curr_eval);
-            transcript.append_bytes(&curr_merkle_tree.root);
+            offset = offset.square();
+
+            let root = commit(&polynomial, domain_size, &offset, transcript);
+            fri_layers.push(
+                FriLayer::<F>::new(
+                    root,
+                    FieldElement::<F>::from(0_u64),
+                    FieldElement::<F>::from(0_u64),
+                )
+            );
         }
 
-        let constant_poly = curr_poly.coefficients.first().unwrap();
+        let constant_poly = polynomial.coefficients.first().unwrap();
         transcript.append_bytes(&constant_poly.to_bytes_be());
 
         (fri_layers, constant_poly.clone())
+}
+
+
+fn commit<F>(
+        polynomial: &Polynomial<FieldElement<F>>,
+        domain_size: usize,
+        offset: &FieldElement<F>,
+        transcript: &mut DefaultTranscript<F>
+    ) -> [u8; 32]
+    where
+        F: IsField + IsFFTField,
+        FieldElement<F>: AsBytes + ByteConversion,
+        <F as IsField>::BaseType: Sync + Send,
+    {
+        let eval = Polynomial::evaluate_offset_fft::<F>(
+            &polynomial,
+            1, 
+            Some(domain_size),
+            &offset
+        ).unwrap();
+        
+        let merkle_tree = MerkleTree::<Keccak256Backend<F>>::build(&eval);
+        transcript.append_bytes(&merkle_tree.root);
+        merkle_tree.root
 }
