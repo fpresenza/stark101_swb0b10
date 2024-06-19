@@ -16,7 +16,7 @@ use lambdaworks_crypto::fiat_shamir::{
 };
 
 use crate::poly;
-use crate::fri::{self, FriLayer};
+use crate::fri;
 
 // the stark252 field has 2-adicity of 192, i.e., the largest
 // multiplicative subgroup whose order is a power of two has order 2^192
