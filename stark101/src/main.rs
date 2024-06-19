@@ -7,6 +7,8 @@ use lambdaworks_math::field::{
     element::FieldElement
 };
 
+mod poly;
+mod fri;
 mod prover;
 
 

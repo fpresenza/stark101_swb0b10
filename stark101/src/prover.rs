@@ -6,24 +6,21 @@ use lambdaworks_math::field::{
     element::FieldElement
 };
 use lambdaworks_math::polynomial::Polynomial;
-use lambdaworks_crypto::{
-    merkle_tree::{
-        merkle::MerkleTree,
-        backends::types::Keccak256Backend
-    },
-    fiat_shamir::{
-        is_transcript::IsTranscript,
-        default_transcript::DefaultTranscript
-    }
+use lambdaworks_crypto::merkle_tree::{
+    merkle::MerkleTree,
+    backends::types::Keccak256Backend
+};
+use lambdaworks_crypto::fiat_shamir::{
+    is_transcript::IsTranscript,
+    default_transcript::DefaultTranscript
 };
 
-use stark101::poly;
+use crate::{poly, fri};
 
 // the stark252 field has 2-adicity of 192, i.e., the largest
 // multiplicative subgroup whose order is a power of two has order 2^192
 type F = Stark252PrimeField;
 type FE = FieldElement<F>;
-
 
 pub fn generate_proof(public_input: (U256, usize, usize, FE, FE)) {
     // ===================================
@@ -38,7 +35,8 @@ pub fn generate_proof(public_input: (U256, usize, usize, FE, FE)) {
     let witness = FE::from(3141592_u64);
 
     // define primitive root
-    let g = F::get_primitive_root_of_unity(10).unwrap();
+    let power_of_two = usize::BITS - int_dom_size.leading_zeros() - 1;
+    let g = F::get_primitive_root_of_unity(power_of_two as u64).unwrap();
     let g_to_the_1021 = g.pow(1021_u64);
     let g_to_the_1022 = g * g_to_the_1021;
     let g_to_the_1023 = g * g_to_the_1022;
@@ -61,7 +59,7 @@ pub fn generate_proof(public_input: (U256, usize, usize, FE, FE)) {
     for i in 2..int_dom_size {
         let x = fib_squared[i-2];
         let y = fib_squared[i-1];
-        fib_squared.push(x.pow(2_u64) + y.pow(2_u64));
+        fib_squared.push(x.square() + y.square());
     }
 
     // fft-interpolate the fibonacci square sequence
@@ -79,12 +77,9 @@ pub fn generate_proof(public_input: (U256, usize, usize, FE, FE)) {
     // the offset is obtained as an outside not in the interpolation domain
     let offset = FE::from(2_u64);
     assert!(offset.pow(int_dom_size as u64) != one);
-    let trace_eval = match Polynomial::evaluate_offset_fft::<F>(
+    let trace_eval = Polynomial::evaluate_offset_fft::<F>(
         &trace_poly, 1, Some(eval_dom_size), &offset
-    ) {
-        Ok(p) => p,
-        Err(e) => panic!("{:?}", e),
-    };
+    ).unwrap();
 
     // commit to the trace evaluations over the larger domain using a merkle tree
     let trace_poly_merkle_tree = MerkleTree::<Keccak256Backend<F>>::build(&trace_eval);
@@ -99,13 +94,13 @@ pub fn generate_proof(public_input: (U256, usize, usize, FE, FE)) {
     let x_to_the_1024 = Polynomial::new_monomial(one, int_dom_size);
 
     // initial element constraint
-    let contraint_0_poly_poly = poly::polynomial_division(
+    let contraint_0_poly = poly::polynomial_division(
         &(&trace_poly - fib_squared_0),
         &(&x - one),
         eval_dom_size,
         &offset
     );
-    assert_eq!(contraint_0_poly_poly.degree(), int_dom_size - 2);
+    assert_eq!(contraint_0_poly.degree(), int_dom_size - 2);
 
     // result element constraint
     let contraint_1022_poly = poly::polynomial_division(
@@ -164,16 +159,17 @@ pub fn generate_proof(public_input: (U256, usize, usize, FE, FE)) {
     let a = transcript.sample_field_element();
     let b = transcript.sample_field_element();
     let c = transcript.sample_field_element();
-    let comp_poly = a * contraint_0_poly_poly + b * contraint_1022_poly + c * transition_constraint_poly;
+    let comp_poly = a * contraint_0_poly + b * contraint_1022_poly + c * transition_constraint_poly;
     assert_eq!(comp_poly.degree(), int_dom_size + 1);
 
-    let comp_eval = match Polynomial::evaluate_offset_fft::<F>(
-        &comp_poly, 1, Some(eval_dom_size), &offset
-    ) {
-        Ok(p) => p,
-        Err(e) => panic!("{:?}", e),
-    };
-    let comp_poly_merkle_tree = MerkleTree::<Keccak256Backend<F>>::build(&comp_eval);
-    transcript.append_bytes(&comp_poly_merkle_tree.root);
-    // println!("{:?}", comp_poly_merkle_tree.root);
+    // ===================================
+    // =========|    Part 4:   |==========
+    // ========= FRI Commitment ==========
+    // ===================================
+    fri::commit(
+        &comp_poly,
+        eval_dom_size,
+        &offset,
+        &mut transcript
+    )
 }
