@@ -15,7 +15,8 @@ use lambdaworks_crypto::fiat_shamir::{
     default_transcript::DefaultTranscript
 };
 
-use crate::{poly, fri};
+use crate::poly;
+use crate::fri::{self, FriLayer};
 
 // the stark252 field has 2-adicity of 192, i.e., the largest
 // multiplicative subgroup whose order is a power of two has order 2^192
@@ -46,7 +47,6 @@ pub fn generate_proof(public_input: (U256, usize, usize, FE, FE)) {
     transcript.append_bytes(&modulus.to_bytes_be());
     transcript.append_bytes(&int_dom_size.to_be_bytes());
     transcript.append_bytes(&eval_dom_size.to_be_bytes());
-    transcript.append_bytes(&g.to_bytes_be());
     transcript.append_bytes(&fib_squared_0.to_bytes_be());
     transcript.append_bytes(&fib_squared_1022.to_bytes_be());
     // println!("{:?}", transcript.state());
@@ -166,10 +166,14 @@ pub fn generate_proof(public_input: (U256, usize, usize, FE, FE)) {
     // =========|    Part 4:   |==========
     // ========= FRI Commitment ==========
     // ===================================
-    fri::commit(
+    println!("{:?}", transcript.state());
+    let (fri_layers, constant_poly) = fri::commit_and_fold(
         &comp_poly,
         eval_dom_size,
         &offset,
         &mut transcript
-    )
+    );
+    println!("{:?}", transcript.state());
+    // println!("{:?}", constant_poly);
+
 }
