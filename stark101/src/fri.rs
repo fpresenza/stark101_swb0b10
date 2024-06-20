@@ -20,41 +20,9 @@ use crate::poly;
 pub struct Query<F: IsField> {
     index: Option<usize>,
     eval: Option<FieldElement<F>>,
-    proof: Proof<[u8; 32]>,
-    sym_eval: FieldElement<F>,
-    sym_proof: Proof<[u8; 32]>,
-}
-
-impl<F: IsField> Query<F> {
-    fn for_zero_layer(
-        index: Option<usize>,
-        eval: Option<FieldElement<F>>,
-        proof: Proof<[u8; 32]>,
-        sym_eval: FieldElement<F>,
-        sym_proof: Proof<[u8; 32]>,
-    ) -> Self {
-        Self {
-            index,
-            eval,
-            sym_eval,
-            proof,
-            sym_proof
-        }
-    }
-
-    fn for_folded_layer(
-        proof: Proof<[u8; 32]>,
-        sym_eval: FieldElement<F>,
-        sym_proof: Proof<[u8; 32]>
-    ) -> Self {
-        Self {
-            index: None,
-            eval: None,
-            proof,
-            sym_eval,
-            sym_proof
-        }
-    }
+    proof: Option<Proof<[u8; 32]>>,
+    sym_eval: Option<FieldElement<F>>,
+    sym_proof: Option<Proof<[u8; 32]>>,
 }
 
 pub struct FriLayer<F: IsField> {
@@ -80,7 +48,7 @@ pub fn commit_and_fold<F>(
         offset: &FieldElement<F>,
         num_queries: usize,
         transcript: &mut DefaultTranscript<F>
-    ) -> (Vec<FriLayer<F>>, FieldElement<F>)
+    ) -> Vec<FriLayer<F>>
     where
         F: IsField + IsFFTField,
         FieldElement<F>: AsBytes + ByteConversion + Sync + Send {
@@ -115,13 +83,13 @@ pub fn commit_and_fold<F>(
         let sym_idx = (idx + domain_size / 2) % domain_size;
         transcript.append_bytes(&idx.to_be_bytes());
 
-        Query::for_zero_layer(
-            Some(idx),
-            Some(eval[idx].to_owned()),
-            tree.get_proof_by_pos(idx).unwrap(),
-            eval[sym_idx].to_owned(),
-            tree.get_proof_by_pos(sym_idx).unwrap()
-        )
+        Query {
+            index: Some(idx),
+            eval: Some(eval[idx].to_owned()),
+            proof: Some(tree.get_proof_by_pos(idx).unwrap()),
+            sym_eval: Some(eval[sym_idx].to_owned()),
+            sym_proof: Some(tree.get_proof_by_pos(sym_idx).unwrap())
+        }
     })
     .collect::<Vec<Query<F>>>();
 
@@ -134,7 +102,7 @@ pub fn commit_and_fold<F>(
     );
 
     // recursive foldings
-    for layer in 1..number_of_layers {
+    for layer in 1..(number_of_layers - 1) {
         let beta = transcript.sample_field_element();
     
         polynomial = poly::fold_polynomial(&polynomial, &beta);
@@ -154,11 +122,13 @@ pub fn commit_and_fold<F>(
             let idx = i.to_owned() % domain_size;
             let sym_idx = (idx + domain_size / 2) % domain_size;
 
-            Query::for_folded_layer(
-                tree.get_proof_by_pos(idx).unwrap(),
-                eval[sym_idx].to_owned(),
-                tree.get_proof_by_pos(sym_idx).unwrap()
-            )
+            Query {
+                index: None,
+                eval: None,
+                proof: Some(tree.get_proof_by_pos(idx).unwrap()),
+                sym_eval: Some(eval[sym_idx].to_owned()),
+                sym_proof: Some(tree.get_proof_by_pos(sym_idx).unwrap())
+            }
         })
         .collect::<Vec<Query<F>>>();
 
@@ -170,14 +140,50 @@ pub fn commit_and_fold<F>(
             )
         );
     }
+    // final layer
+    let beta = transcript.sample_field_element();
+    
+    polynomial = poly::fold_polynomial(&polynomial, &beta);
+    domain_size /= 2;
+    offset = offset.square();
+
+    let (eval, tree) = commit(&polynomial, domain_size, &offset);
+    transcript.append_bytes(&tree.root);
+    println!(
+        "Layer {:?}: \n \t Appending root of folded polynomial (degree {:?}) to transcript.",
+        number_of_layers - 1,
+        polynomial.degree()
+    );
 
     let constant_poly = polynomial.coefficients.first().unwrap();
     transcript.append_bytes(&constant_poly.to_bytes_be());
     println!("\t Appending constant polynomial to transcript.");
 
-    (fri_layers, constant_poly.clone())
-}
+    // get queries evaluations, add to transcript and generate inclusion proofs
+    let queries = query_indices.iter().map(|i| { 
+        let idx = i.to_owned() % domain_size;
+        let sym_idx = (idx + domain_size / 2) % domain_size;
 
+        Query {
+            index: None,
+            eval: Some(constant_poly.to_owned()),
+            proof: Some(tree.get_proof_by_pos(idx).unwrap()),
+            sym_eval: Some(eval[sym_idx].to_owned()),
+            sym_proof: Some(tree.get_proof_by_pos(sym_idx).unwrap())
+        }
+    })
+    .collect::<Vec<Query<F>>>();
+
+    // append layer
+    fri_layers.push(
+        FriLayer::<F>::new(
+            tree.root,
+            queries
+        )
+    );
+
+    fri_layers
+}
 
 fn commit<F>(
         polynomial: &Polynomial<FieldElement<F>>,

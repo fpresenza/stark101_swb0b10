@@ -182,14 +182,12 @@ pub fn generate_proof(public_input: PublicInput<F>) {
     // =========|    Part 4:   |==========
     // ========= FRI Commitment ==========
     // ===================================
-    // println!("{:?}", transcript.state());
-    let (fri_layers, constant_poly) = fri::commit_and_fold(
+    let fri_layers = fri::commit_and_fold(
         &comp_poly,
         eval_dom_size,
         &offset,
         num_queries,
         &mut transcript
     );
-    // println!("{:?}", transcript.state());
 
 }
