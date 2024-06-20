@@ -18,9 +18,7 @@ use lambdaworks_math::unsigned_integer::element::U256;
 use crate::poly;
 
 #[derive(Clone)]
-pub struct Query<F: IsField> {
-    index: Option<usize>,
-    eval: Option<FieldElement<F>>,
+pub struct ValidationData<F: IsField> {
     proof: Option<Proof<[u8; 32]>>,
     sym_eval: Option<FieldElement<F>>,
     sym_proof: Option<Proof<[u8; 32]>>,
@@ -29,7 +27,7 @@ pub struct Query<F: IsField> {
 #[derive(Clone)]
 pub struct FriLayer<F: IsField> {
     root: [u8; 32],
-    queries: Vec<Query<F>>,
+    queries: Vec<ValidationData<F>>,
 }
 
 pub fn commit_and_fold<F>(
@@ -67,15 +65,13 @@ pub fn commit_and_fold<F>(
                 let sym_idx = (idx + domain_size / 2) % domain_size;
                 transcript.append_bytes(&idx.to_be_bytes());
         
-                Query {
-                    index: Some(idx),
-                    eval: Some(eval[idx].to_owned()),
+                ValidationData {
                     proof: Some(tree.get_proof_by_pos(idx).unwrap()),
                     sym_eval: Some(eval[sym_idx].to_owned()),
                     sym_proof: Some(tree.get_proof_by_pos(sym_idx).unwrap())
                 }
             })
-            .collect::<Vec<Query<F>>>()
+            .collect::<Vec<ValidationData<F>>>()
         }
     );
 
@@ -100,15 +96,13 @@ pub fn commit_and_fold<F>(
                     let idx = i.to_owned() % domain_size;
                     let sym_idx = (idx + domain_size / 2) % domain_size;
         
-                    Query {
-                        index: None,
-                        eval: None,
+                    ValidationData {
                         proof: Some(tree.get_proof_by_pos(idx).unwrap()),
                         sym_eval: Some(eval[sym_idx].to_owned()),
                         sym_proof: Some(tree.get_proof_by_pos(sym_idx).unwrap())
                     }
                 })
-                .collect::<Vec<Query<F>>>()
+                .collect::<Vec<ValidationData<F>>>()
             }
         );
     }
@@ -136,15 +130,13 @@ pub fn commit_and_fold<F>(
                 let idx = i.to_owned() % domain_size;
                 let sym_idx = (idx + domain_size / 2) % domain_size;
         
-                Query {
-                    index: None,
-                    eval: Some(constant_poly.to_owned()),
+                ValidationData {
                     proof: Some(tree.get_proof_by_pos(idx).unwrap()),
                     sym_eval: Some(eval[sym_idx].to_owned()),
                     sym_proof: Some(tree.get_proof_by_pos(sym_idx).unwrap())
                 }
             })
-            .collect::<Vec<Query<F>>>()
+            .collect::<Vec<ValidationData<F>>>()
         }
     );
 
