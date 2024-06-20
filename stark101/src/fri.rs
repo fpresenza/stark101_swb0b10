@@ -17,6 +17,7 @@ use lambdaworks_math::unsigned_integer::element::U256;
 
 use crate::poly;
 
+#[derive(Clone)]
 pub struct Query<F: IsField> {
     index: Option<usize>,
     eval: Option<FieldElement<F>>,
@@ -25,6 +26,7 @@ pub struct Query<F: IsField> {
     sym_proof: Option<Proof<[u8; 32]>>,
 }
 
+#[derive(Clone)]
 pub struct FriLayer<F: IsField> {
     root: [u8; 32],
     queries: Vec<Query<F>>,
