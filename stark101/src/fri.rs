@@ -45,15 +45,14 @@ impl<F: IsField> FriLayer<F> {
 
 pub fn commit_and_fold<F>(
         polynomial: &Polynomial<FieldElement<F>>,
-
         mut domain_size: usize,
         offset: &FieldElement<F>,
+        num_queries: usize,
         transcript: &mut DefaultTranscript<F>
     ) -> (Vec<FriLayer<F>>, FieldElement<F>)
     where
         F: IsField + IsFFTField,
-        FieldElement<F>: AsBytes + ByteConversion,
-        <F as IsField>::BaseType: Sync + Send {
+        FieldElement<F>: AsBytes + ByteConversion + Sync + Send {
 
     let mut polynomial = polynomial.clone();
     let mut offset = offset.clone();
@@ -64,8 +63,12 @@ pub fn commit_and_fold<F>(
     let (eval, root) = commit(&polynomial, domain_size, &offset, transcript);
 
      // sample queries
-    let number_of_queries = 10_usize;
-    let query_indices = sample_queries(number_of_queries, domain_size, transcript);
+    let query_indices = sample_queries(num_queries, domain_size, transcript);
+
+    /*
+        TODO: 
+        get queries evaluations and generate proofs
+    */
 
     // append layer
     fri_layers.push(
@@ -113,8 +116,7 @@ fn commit<F>(
     ) -> (Vec<FieldElement<F>>, [u8; 32])
     where
         F: IsField + IsFFTField,
-        FieldElement<F>: AsBytes + ByteConversion,
-        <F as IsField>::BaseType: Sync + Send {
+        FieldElement<F>: AsBytes + ByteConversion + Sync + Send {
 
     let eval = Polynomial::evaluate_offset_fft::<F>(
         polynomial,
@@ -129,7 +131,7 @@ fn commit<F>(
 }
 
 fn sample_queries<F>(
-        number_of_queries: usize,
+        num_queries: usize,
         domain_size: usize,
         transcript: &mut DefaultTranscript<F>
     ) -> Vec<u64> 
@@ -137,9 +139,9 @@ fn sample_queries<F>(
         F: IsField,
         FieldElement<F>: AsBytes + ByteConversion {
 
-    let mut query_indices = Vec::<u64>::with_capacity(number_of_queries);
+    let mut query_indices = Vec::<u64>::with_capacity(num_queries);
 
-    for _ in 0..number_of_queries {
+    for _ in 0..num_queries {
         let (_, query_index) = U256::from_bytes_be(
             &transcript.sample()
         ).unwrap()

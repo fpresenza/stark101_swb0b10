@@ -1,5 +1,4 @@
 use lambdaworks_math::traits::ByteConversion;
-use lambdaworks_math::unsigned_integer::element::U256;
 use lambdaworks_math::field::{
     traits::IsFFTField,
     fields::fft_friendly::stark_252_prime_field::Stark252PrimeField,
@@ -16,6 +15,7 @@ use lambdaworks_crypto::fiat_shamir::{
 };
 
 use crate::poly;
+use crate::input::PublicInput;
 use crate::fri;
 
 // the stark252 field has 2-adicity of 192, i.e., the largest
@@ -23,13 +23,29 @@ use crate::fri;
 type F = Stark252PrimeField;
 type FE = FieldElement<F>;
 
-pub fn generate_proof(public_input: (U256, usize, usize, FE, FE)) {
+pub fn generate_proof(public_input: PublicInput<F>) {
     // ===================================
     // ==========|    Part 1:   |=========
     // === Statement, LDE & Commitment ===
     // ===================================
     // extract public input
-    let (modulus, int_dom_size, eval_dom_size, fib_squared_0, fib_squared_1022) = public_input;
+    let PublicInput(
+        modulus,
+        int_dom_size,
+        eval_dom_size,
+        num_queries,
+        fib_squared_0,
+        fib_squared_1022
+    ) = public_input;
+
+    // initialize transcript and append all public inputs
+    let mut transcript = DefaultTranscript::<F>::new(&[]);
+    transcript.append_bytes(&modulus.to_bytes_be());
+    transcript.append_bytes(&int_dom_size.to_be_bytes());
+    transcript.append_bytes(&eval_dom_size.to_be_bytes());
+    transcript.append_bytes(&num_queries.to_be_bytes());
+    transcript.append_bytes(&fib_squared_0.to_bytes_be());
+    transcript.append_bytes(&fib_squared_1022.to_bytes_be());
 
     // define example parameters
     let one = FE::one();
@@ -42,14 +58,6 @@ pub fn generate_proof(public_input: (U256, usize, usize, FE, FE)) {
     let g_to_the_1022 = g * g_to_the_1021;
     let g_to_the_1023 = g * g_to_the_1022;
 
-    // initialize transcript
-    let mut transcript = DefaultTranscript::<F>::new(&[]);
-    transcript.append_bytes(&modulus.to_bytes_be());
-    transcript.append_bytes(&int_dom_size.to_be_bytes());
-    transcript.append_bytes(&eval_dom_size.to_be_bytes());
-    transcript.append_bytes(&fib_squared_0.to_bytes_be());
-    transcript.append_bytes(&fib_squared_1022.to_bytes_be());
-    // println!("{:?}", transcript.state());
 
     // create vec to hold fibonacci square sequence
     let mut fib_squared = Vec::<FE>::with_capacity(int_dom_size);
@@ -84,7 +92,6 @@ pub fn generate_proof(public_input: (U256, usize, usize, FE, FE)) {
     // commit to the trace evaluations over the larger domain using a merkle tree
     let trace_poly_merkle_tree = MerkleTree::<Keccak256Backend<F>>::build(&trace_eval);
     transcript.append_bytes(&trace_poly_merkle_tree.root);
-    // println!("{:?}", trace_poly_merkle_tree.root);
 
     // ===================================
     // =========|    Part 2:   |==========
@@ -171,9 +178,9 @@ pub fn generate_proof(public_input: (U256, usize, usize, FE, FE)) {
         &comp_poly,
         eval_dom_size,
         &offset,
+        num_queries,
         &mut transcript
     );
     println!("{:?}", transcript.state());
-    // println!("{:?}", constant_poly);
 
 }
