@@ -99,7 +99,13 @@ pub fn commit_and_fold<F>(
     );
 
      // sample queries
-    let query_indices = sample_queries(num_queries, domain_size, transcript);
+    let query_indices = (0..num_queries)
+        .map(|_| {
+            let query_index = U256::from_bytes_be(&transcript.sample()).unwrap();
+            let(_, query_index) = query_index.div_rem(&U256::from(domain_size as u64));
+            query_index.limbs[3] as usize
+        })
+        .collect::<Vec<usize>>();
     println!("\t Query indices: {:?}", query_indices);
 
     // get queries evaluations,add to transcript and generate inclusion proofs
@@ -147,7 +153,6 @@ pub fn commit_and_fold<F>(
         let queries = query_indices.iter().map(|i| { 
             let idx = i.to_owned() % domain_size;
             let sym_idx = (idx + domain_size / 2) % domain_size;
-            // transcript.append_bytes(&idx.to_be_bytes());
 
             Query::for_folded_layer(
                 tree.get_proof_by_pos(idx).unwrap(),
@@ -192,27 +197,4 @@ fn commit<F>(
     let tree = MerkleTree::<Keccak256Backend<F>>::build(&eval);
 
     (eval, tree)
-}
-
-fn sample_queries<F>(
-        num_queries: usize,
-        domain_size: usize,
-        transcript: &mut DefaultTranscript<F>
-    ) -> Vec<usize> 
-    where 
-        F: IsField,
-        FieldElement<F>: AsBytes + ByteConversion {
-
-    let mut query_indices = Vec::<usize>::with_capacity(num_queries);
-
-    for _ in 0..num_queries {
-        let (_, query_index) = U256::from_bytes_be(
-            &transcript.sample()
-        ).unwrap()
-        .div_rem(
-            &U256::from(domain_size as u64)
-        );
-        query_indices.push(query_index.limbs[3] as usize);
-    }
-    query_indices
 }
