@@ -30,18 +30,6 @@ pub struct FriLayer<F: IsField> {
     queries: Vec<Query<F>>,
 }
 
-impl<F: IsField> FriLayer<F> {
-    fn new(
-        root: [u8; 32],
-        queries: Vec<Query<F>>,
-    ) -> Self {
-        Self {
-            root,
-            queries
-        }
-    }
-}
-
 pub fn commit_and_fold<F>(
         polynomial: &Polynomial<FieldElement<F>>,
         mut domain_size: usize,
@@ -55,8 +43,8 @@ pub fn commit_and_fold<F>(
 
     let mut polynomial = polynomial.clone();
     let mut offset = offset.clone();
-    let number_of_layers = (usize::BITS - polynomial.degree().leading_zeros() + 1) as usize;
-    let mut fri_layers = Vec::<FriLayer<F>>::with_capacity(number_of_layers);
+    let number_of_foldings = (usize::BITS - polynomial.degree().leading_zeros()) as usize;
+    let mut fri_layers = Vec::<FriLayer<F>>::with_capacity(number_of_foldings + 1);
 
     // commit to evaluations
     let (eval, tree) = commit(&polynomial, domain_size, &offset);
@@ -78,31 +66,29 @@ pub fn commit_and_fold<F>(
 
     // get queries evaluations,add to transcript and generate inclusion proofs
     println!("\t Appending query indices to transcript.");
-    let queries = query_indices.iter().map(|i| { 
-        let idx = i.to_owned();
-        let sym_idx = (idx + domain_size / 2) % domain_size;
-        transcript.append_bytes(&idx.to_be_bytes());
-
-        Query {
-            index: Some(idx),
-            eval: Some(eval[idx].to_owned()),
-            proof: Some(tree.get_proof_by_pos(idx).unwrap()),
-            sym_eval: Some(eval[sym_idx].to_owned()),
-            sym_proof: Some(tree.get_proof_by_pos(sym_idx).unwrap())
-        }
-    })
-    .collect::<Vec<Query<F>>>();
-
     // append layer
     fri_layers.push(
-        FriLayer::<F>::new(
-            tree.root,
-            queries
-        )
+        FriLayer {
+            root: tree.root,
+            queries: query_indices.iter().map(|i| { 
+                let idx = i.to_owned();
+                let sym_idx = (idx + domain_size / 2) % domain_size;
+                transcript.append_bytes(&idx.to_be_bytes());
+        
+                Query {
+                    index: Some(idx),
+                    eval: Some(eval[idx].to_owned()),
+                    proof: Some(tree.get_proof_by_pos(idx).unwrap()),
+                    sym_eval: Some(eval[sym_idx].to_owned()),
+                    sym_proof: Some(tree.get_proof_by_pos(sym_idx).unwrap())
+                }
+            })
+            .collect::<Vec<Query<F>>>()
+        }
     );
 
     // recursive foldings
-    for layer in 1..(number_of_layers - 1) {
+    for layer in 1..number_of_foldings {
         let beta = transcript.sample_field_element();
     
         polynomial = poly::fold_polynomial(&polynomial, &beta);
@@ -117,27 +103,24 @@ pub fn commit_and_fold<F>(
             polynomial.degree()
         );
 
-        // get queries evaluations,add to transcript and generate inclusion proofs
-        let queries = query_indices.iter().map(|i| { 
-            let idx = i.to_owned() % domain_size;
-            let sym_idx = (idx + domain_size / 2) % domain_size;
-
-            Query {
-                index: None,
-                eval: None,
-                proof: Some(tree.get_proof_by_pos(idx).unwrap()),
-                sym_eval: Some(eval[sym_idx].to_owned()),
-                sym_proof: Some(tree.get_proof_by_pos(sym_idx).unwrap())
-            }
-        })
-        .collect::<Vec<Query<F>>>();
-
         // append layer
         fri_layers.push(
-            FriLayer::<F>::new(
-                tree.root,
-                queries
-            )
+            FriLayer {
+                root: tree.root,
+                queries: query_indices.iter().map(|i| { 
+                    let idx = i.to_owned() % domain_size;
+                    let sym_idx = (idx + domain_size / 2) % domain_size;
+        
+                    Query {
+                        index: None,
+                        eval: None,
+                        proof: Some(tree.get_proof_by_pos(idx).unwrap()),
+                        sym_eval: Some(eval[sym_idx].to_owned()),
+                        sym_proof: Some(tree.get_proof_by_pos(sym_idx).unwrap())
+                    }
+                })
+                .collect::<Vec<Query<F>>>()
+            }
         );
     }
     // final layer
@@ -151,7 +134,7 @@ pub fn commit_and_fold<F>(
     transcript.append_bytes(&tree.root);
     println!(
         "Layer {:?}: \n \t Appending root of folded polynomial (degree {:?}) to transcript.",
-        number_of_layers - 1,
+        number_of_foldings,
         polynomial.degree()
     );
 
@@ -159,27 +142,24 @@ pub fn commit_and_fold<F>(
     transcript.append_bytes(&constant_poly.to_bytes_be());
     println!("\t Appending constant polynomial to transcript.");
 
-    // get queries evaluations, add to transcript and generate inclusion proofs
-    let queries = query_indices.iter().map(|i| { 
-        let idx = i.to_owned() % domain_size;
-        let sym_idx = (idx + domain_size / 2) % domain_size;
-
-        Query {
-            index: None,
-            eval: Some(constant_poly.to_owned()),
-            proof: Some(tree.get_proof_by_pos(idx).unwrap()),
-            sym_eval: Some(eval[sym_idx].to_owned()),
-            sym_proof: Some(tree.get_proof_by_pos(sym_idx).unwrap())
-        }
-    })
-    .collect::<Vec<Query<F>>>();
-
     // append layer
     fri_layers.push(
-        FriLayer::<F>::new(
-            tree.root,
-            queries
-        )
+        FriLayer {
+            root: tree.root,
+            queries: query_indices.iter().map(|i| { 
+                let idx = i.to_owned() % domain_size;
+                let sym_idx = (idx + domain_size / 2) % domain_size;
+        
+                Query {
+                    index: None,
+                    eval: Some(constant_poly.to_owned()),
+                    proof: Some(tree.get_proof_by_pos(idx).unwrap()),
+                    sym_eval: Some(eval[sym_idx].to_owned()),
+                    sym_proof: Some(tree.get_proof_by_pos(sym_idx).unwrap())
+                }
+            })
+            .collect::<Vec<Query<F>>>()
+        }
     );
 
     fri_layers
