@@ -182,11 +182,15 @@ pub fn generate_proof(public_input: PublicInput<F>) {
     // =========|    Part 4:   |==========
     // ========= FRI Commitment ==========
     // ===================================
+    //  // sample queries
+    let query_indices = fri::sample_queries(num_queries, eval_dom_size, &mut transcript);
+    println!("Sampling Query indices: {:?}", query_indices);
+    
     let fri_layers = fri::commit_and_fold(
         &comp_poly,
         eval_dom_size,
         &offset,
-        num_queries,
+        query_indices,
         &mut transcript
     );
 

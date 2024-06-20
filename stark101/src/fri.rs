@@ -36,7 +36,7 @@ pub fn commit_and_fold<F>(
         polynomial: &Polynomial<FieldElement<F>>,
         mut domain_size: usize,
         offset: &FieldElement<F>,
-        num_queries: usize,
+        query_indices: Vec<usize>,
         transcript: &mut DefaultTranscript<F>
     ) -> Vec<FriLayer<F>>
     where
@@ -55,10 +55,6 @@ pub fn commit_and_fold<F>(
         "Layer 0: \n \t Appending root of composition polynomial (degree {:?}) to transcript.",
          polynomial.degree()
     );
-
-     // sample queries
-    let query_indices = sample_queries(num_queries, domain_size, transcript);
-    println!("\t Query indices: {:?}", query_indices);
 
     // get queries evaluations,add to transcript and generate inclusion proofs
     println!("\t Appending query indices to transcript.");
@@ -189,7 +185,7 @@ fn fold<F: IsField>(
     )
 }
 
-fn sample_queries<F>(
+pub fn sample_queries<F>(
         num_queries: usize,
         domain_size: usize,
         transcript: &mut DefaultTranscript<F>

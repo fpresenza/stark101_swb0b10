@@ -17,7 +17,7 @@ pub struct PublicInput<F: IsField> (
 );
 
 #[derive(Clone)]
-pub struct Proof<F: IsField> {
+pub struct StarkProof<F: IsField> {
 	pub trace_root: [u8; 32],
 	pub cp_root: [u8; 32],
 	pub fri_layers: FriLayer<F>
