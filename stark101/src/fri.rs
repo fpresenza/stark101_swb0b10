@@ -19,9 +19,9 @@ use crate::poly;
 
 #[derive(Clone)]
 pub struct ValidationData<F: IsField> {
-    proof: Option<Proof<[u8; 32]>>,
-    sym_eval: Option<FieldElement<F>>,
-    sym_proof: Option<Proof<[u8; 32]>>,
+    proof: Proof<[u8; 32]>,
+    sym_eval: FieldElement<F>,
+    sym_proof: Proof<[u8; 32]>,
 }
 
 #[derive(Clone)]
@@ -66,9 +66,9 @@ pub fn commit_and_fold<F>(
                 transcript.append_bytes(&idx.to_be_bytes());
         
                 ValidationData {
-                    proof: Some(tree.get_proof_by_pos(idx).unwrap()),
-                    sym_eval: Some(eval[sym_idx].to_owned()),
-                    sym_proof: Some(tree.get_proof_by_pos(sym_idx).unwrap())
+                    proof: tree.get_proof_by_pos(idx).unwrap(),
+                    sym_eval: eval[sym_idx].to_owned(),
+                    sym_proof: tree.get_proof_by_pos(sym_idx).unwrap()
                 }
             })
             .collect::<Vec<ValidationData<F>>>()
@@ -97,9 +97,9 @@ pub fn commit_and_fold<F>(
                     let sym_idx = (idx + domain_size / 2) % domain_size;
         
                     ValidationData {
-                        proof: Some(tree.get_proof_by_pos(idx).unwrap()),
-                        sym_eval: Some(eval[sym_idx].to_owned()),
-                        sym_proof: Some(tree.get_proof_by_pos(sym_idx).unwrap())
+                        proof: tree.get_proof_by_pos(idx).unwrap(),
+                        sym_eval: eval[sym_idx].to_owned(),
+                        sym_proof: tree.get_proof_by_pos(sym_idx).unwrap()
                     }
                 })
                 .collect::<Vec<ValidationData<F>>>()
@@ -131,9 +131,9 @@ pub fn commit_and_fold<F>(
                 let sym_idx = (idx + domain_size / 2) % domain_size;
         
                 ValidationData {
-                    proof: Some(tree.get_proof_by_pos(idx).unwrap()),
-                    sym_eval: Some(eval[sym_idx].to_owned()),
-                    sym_proof: Some(tree.get_proof_by_pos(sym_idx).unwrap())
+                    proof: tree.get_proof_by_pos(idx).unwrap(),
+                    sym_eval: eval[sym_idx].to_owned(),
+                    sym_proof: tree.get_proof_by_pos(sym_idx).unwrap()
                 }
             })
             .collect::<Vec<ValidationData<F>>>()
