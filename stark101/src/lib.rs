@@ -1,4 +1,4 @@
 pub mod poly;
-pub mod input;
+pub mod common;
 pub mod fri;
 pub mod prover;

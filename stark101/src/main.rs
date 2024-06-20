@@ -8,7 +8,7 @@ use lambdaworks_math::field::{
 };
 
 mod poly;
-mod input;
+mod common;
 mod fri;
 mod prover;
 
@@ -23,7 +23,7 @@ const INT_DOM_SIZE: usize = 0b10000000000;
 // evaluation domain of size 8192 = 2^13 (blow-up factor is 2^3)
 const EVAL_DOM_SIZE: usize = 0b10000000000000;
 // number of queries in FRI
-const NUM_QUERIES: usize = 10;
+const NUM_QUERIES: usize = 5;
 
 
 fn main() {
@@ -36,7 +36,7 @@ fn main() {
     let fib_squared_0 = FE::one();
     let fib_squared_1022 = FE::from_hex_unchecked("6A317721EF632FF24FB815C9BBD4D4582BC7E21A43CFBDD89A8B8F0BDA68252");
 
-    let public_input = input::PublicInput(
+    let public_input = common::PublicInput(
         modulus,
         INT_DOM_SIZE,
         EVAL_DOM_SIZE,

@@ -15,7 +15,7 @@ use lambdaworks_crypto::fiat_shamir::{
 };
 
 use crate::poly;
-use crate::input::PublicInput;
+use crate::common::PublicInput;
 use crate::fri;
 
 // the stark252 field has 2-adicity of 192, i.e., the largest
