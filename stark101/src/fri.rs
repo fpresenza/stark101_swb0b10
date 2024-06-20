@@ -76,7 +76,7 @@ pub fn commit_and_fold<F>(
     );
 
     // recursive foldings
-    for layer in 1..number_of_foldings {
+    for layer in 1..=number_of_foldings {
         let beta = transcript.sample_field_element();
         (polynomial, domain_size, offset) = fold(polynomial, domain_size, offset, beta);
 
@@ -106,39 +106,6 @@ pub fn commit_and_fold<F>(
             }
         );
     }
-    // final layer
-    let beta = transcript.sample_field_element();
-    (polynomial, domain_size, offset) = fold(polynomial, domain_size, offset, beta);
-
-    let (eval, tree) = commit(&polynomial, domain_size, &offset);
-    transcript.append_bytes(&tree.root);
-    println!(
-        "Layer {:?}: \n \t Appending root of folded polynomial (degree {:?}) to transcript.",
-        number_of_foldings,
-        polynomial.degree()
-    );
-
-    let constant_poly = polynomial.coefficients.first().unwrap();
-    transcript.append_bytes(&constant_poly.to_bytes_be());
-    println!("\t Appending constant polynomial to transcript.");
-
-    // append layer
-    fri_layers.push(
-        FriLayer {
-            root: tree.root,
-            queries: query_indices.iter().map(|i| { 
-                let idx = i.to_owned() % domain_size;
-                let sym_idx = (idx + domain_size / 2) % domain_size;
-        
-                ValidationData {
-                    proof: tree.get_proof_by_pos(idx).unwrap(),
-                    sym_eval: eval[sym_idx].to_owned(),
-                    sym_proof: tree.get_proof_by_pos(sym_idx).unwrap()
-                }
-            })
-            .collect::<Vec<ValidationData<F>>>()
-        }
-    );
 
     fri_layers
 }
