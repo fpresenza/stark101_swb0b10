@@ -86,10 +86,7 @@ pub fn commit_and_fold<F>(
     // recursive foldings
     for layer in 1..number_of_foldings {
         let beta = transcript.sample_field_element();
-    
-        polynomial = poly::fold_polynomial(&polynomial, &beta);
-        domain_size /= 2;
-        offset = offset.square();
+        (polynomial, domain_size, offset) = fold(polynomial, domain_size, offset, beta);
 
         let (eval, tree) = commit(&polynomial, domain_size, &offset);
         transcript.append_bytes(&tree.root);
@@ -121,10 +118,7 @@ pub fn commit_and_fold<F>(
     }
     // final layer
     let beta = transcript.sample_field_element();
-    
-    polynomial = poly::fold_polynomial(&polynomial, &beta);
-    domain_size /= 2;
-    offset = offset.square();
+    (polynomial, domain_size, offset) = fold(polynomial, domain_size, offset, beta);
 
     let (eval, tree) = commit(&polynomial, domain_size, &offset);
     transcript.append_bytes(&tree.root);
@@ -180,6 +174,19 @@ fn commit<F>(
     let tree = MerkleTree::<Keccak256Backend<F>>::build(&eval);
 
     (eval, tree)
+}
+
+fn fold<F: IsField>(
+        polynomial: Polynomial<FieldElement<F>>,
+        domain_size: usize,
+        offset: FieldElement<F>,
+        beta: FieldElement<F>
+    ) -> (Polynomial<FieldElement<F>>, usize, FieldElement<F>) {
+    (
+        poly::fold_polynomial(&polynomial, &beta),
+        domain_size / 2,
+        offset.square()
+    )
 }
 
 fn sample_queries<F>(

@@ -1,6 +1,6 @@
-use lambdaworks_math::field::traits::IsField;
 use lambdaworks_math::unsigned_integer::element::U256;
 use lambdaworks_math::field::{
+	traits::IsField,
     element::FieldElement
 };
 
@@ -18,6 +18,8 @@ pub struct PublicInput<F: IsField> (
 
 #[derive(Clone)]
 pub struct Proof<F: IsField> {
+	pub trace_root: [u8; 32],
+	pub cp_root: [u8; 32],
 	pub fri_layers: FriLayer<F>
 }
 
