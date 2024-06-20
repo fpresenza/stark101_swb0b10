@@ -173,6 +173,7 @@ pub fn commit_and_fold<F>(
 
     let constant_poly = polynomial.coefficients.first().unwrap();
     transcript.append_bytes(&constant_poly.to_bytes_be());
+    println!("\t Appending constant polynomial to transcript.");
 
     (fri_layers, constant_poly.clone())
 }
