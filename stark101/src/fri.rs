@@ -18,23 +18,41 @@ use lambdaworks_math::unsigned_integer::element::U256;
 use crate::poly;
 
 pub struct Query<F: IsField> {
-    index: usize,
-    eval: FieldElement<F>,
+    index: Option<usize>,
+    eval: Option<FieldElement<F>>,
+    proof: Proof<[u8; 32]>,
     sym_eval: FieldElement<F>,
-    // proof: Proof<[u8; 32]>,
-    // sym_proof: Proof<[u8; 32]>,
+    sym_proof: Proof<[u8; 32]>,
 }
 
 impl<F: IsField> Query<F> {
-    fn new(
-        index: usize,
-        eval: FieldElement<F>,
+    fn for_zero_layer(
+        index: Option<usize>,
+        eval: Option<FieldElement<F>>,
+        proof: Proof<[u8; 32]>,
         sym_eval: FieldElement<F>,
+        sym_proof: Proof<[u8; 32]>,
     ) -> Self {
         Self {
             index,
             eval,
-            sym_eval
+            sym_eval,
+            proof,
+            sym_proof
+        }
+    }
+
+    fn for_folded_layer(
+        proof: Proof<[u8; 32]>,
+        sym_eval: FieldElement<F>,
+        sym_proof: Proof<[u8; 32]>
+    ) -> Self {
+        Self {
+            index: None,
+            eval: None,
+            proof,
+            sym_eval,
+            sym_proof
         }
     }
 }
@@ -73,25 +91,38 @@ pub fn commit_and_fold<F>(
     let mut fri_layers = Vec::<FriLayer<F>>::with_capacity(number_of_layers);
 
     // commit to evaluations
-    let (eval, root) = commit(&polynomial, domain_size, &offset, transcript);
+    let (eval, tree) = commit(&polynomial, domain_size, &offset, transcript);
     println!(
-        "Layer 0: appending root of composition polynomial (degree {:?}) to transcript.",
+        "Layer 0: \n \t Appending root of composition polynomial (degree {:?}) to transcript.",
          polynomial.degree()
     );
 
      // sample queries
     let query_indices = sample_queries(num_queries, domain_size, transcript);
+    println!("\t Query indices: {:?}", query_indices);
 
-    /*
-        TODO: 
-        get queries evaluations and generate proofs
-    */
+    // get queries evaluations,add to transcript and generate inclusion proofs
+    println!("\t Appending query indices to transcript.");
+    let queries = query_indices.iter().map(|i| { 
+        let idx = *i as usize;
+        let sym_idx = (idx + domain_size / 2) % domain_size;
+        transcript.append_bytes(&idx.to_be_bytes());
+
+        Query::for_zero_layer(
+            Some(idx),
+            Some(eval[idx].to_owned()),
+            tree.get_proof_by_pos(idx).unwrap(),
+            eval[sym_idx].to_owned(),
+            tree.get_proof_by_pos(sym_idx).unwrap()
+        )
+    })
+    .collect::<Vec<Query<F>>>();
 
     // append layer
     fri_layers.push(
         FriLayer::<F>::new(
-            root,
-            vec![Query::<F>::new(1, FieldElement::one(), FieldElement::one())]
+            tree.root,
+            queries
         )
     );
 
@@ -103,19 +134,19 @@ pub fn commit_and_fold<F>(
         domain_size /= 2;
         offset = offset.square();
 
-        let (eval, root) = commit(&polynomial, domain_size, &offset, transcript);
+        let (eval, tree) = commit(&polynomial, domain_size, &offset, transcript);
         println!(
-            "Layer {:?}: appending root of folded polynomial (degree {:?}) to transcript.",
+            "Layer {:?}: \n \t Appending root of folded polynomial (degree {:?}) to transcript.",
             layer,
             polynomial.degree()
         );
 
-        fri_layers.push(
-            FriLayer::<F>::new(
-                root,
-                vec![Query::<F>::new(1, FieldElement::one(), FieldElement::one())]
-            )
-        );
+        // fri_layers.push(
+        //     FriLayer::<F>::new(
+        //         root,
+        //         vec![Query::<F>::new(None, None, FieldElement::one())]
+        //     )
+        // );
     }
 
     let constant_poly = polynomial.coefficients.first().unwrap();
@@ -130,7 +161,7 @@ fn commit<F>(
         domain_size: usize,
         offset: &FieldElement<F>,
         transcript: &mut DefaultTranscript<F>
-    ) -> (Vec<FieldElement<F>>, [u8; 32])
+    ) -> (Vec<FieldElement<F>>, MerkleTree<Keccak256Backend<F>>)
     where
         F: IsField + IsFFTField,
         FieldElement<F>: AsBytes + ByteConversion + Sync + Send {
@@ -142,10 +173,10 @@ fn commit<F>(
         offset
     ).unwrap();
     
-    let merkle_tree = MerkleTree::<Keccak256Backend<F>>::build(&eval);
-    transcript.append_bytes(&merkle_tree.root);
+    let tree = MerkleTree::<Keccak256Backend<F>>::build(&eval);
+    transcript.append_bytes(&tree.root);
 
-    (eval, merkle_tree.root)
+    (eval, tree)
 }
 
 fn sample_queries<F>(

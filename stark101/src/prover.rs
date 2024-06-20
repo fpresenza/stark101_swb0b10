@@ -24,7 +24,13 @@ type F = Stark252PrimeField;
 type FE = FieldElement<F>;
 
 pub fn generate_proof(public_input: PublicInput<F>) {
-    println!("####### Prover ######\n");
+    println!(
+        "
+        ===================================
+        ==========|   PROVER   |===========
+        ===================================
+        "
+    );
     // ===================================
     // ==========|    Part 1:   |=========
     // === Statement, LDE & Commitment ===
