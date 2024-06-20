@@ -17,28 +17,41 @@ use lambdaworks_math::unsigned_integer::element::U256;
 
 use crate::poly;
 
+pub struct Query<F: IsField> {
+    index: usize,
+    eval: FieldElement<F>,
+    sym_eval: FieldElement<F>,
+    // proof: Proof<[u8; 32]>,
+    // sym_proof: Proof<[u8; 32]>,
+}
+
+impl<F: IsField> Query<F> {
+    fn new(
+        index: usize,
+        eval: FieldElement<F>,
+        sym_eval: FieldElement<F>,
+    ) -> Self {
+        Self {
+            index,
+            eval,
+            sym_eval
+        }
+    }
+}
+
 pub struct FriLayer<F: IsField> {
-    merkle_root: [u8; 32],
-    queries_eval: Vec<FieldElement<F>>,
-    // queries_merkle_proof: Vec<Proof<[u8; 32]>>,
-    queries_sym_eval: Vec<FieldElement<F>>,
-    // queries_sym_merkle_proof: Vec<Proof<[u8; 32]>>,
+    root: [u8; 32],
+    queries: Vec<Query<F>>,
 }
 
 impl<F: IsField> FriLayer<F> {
     fn new(
-        merkle_root: [u8; 32],
-        queries_eval: Vec<FieldElement<F>>,
-        // queries_merkle_proof: Vec<Proof<[u8; 32]>>,
-        queries_sym_eval: Vec<FieldElement<F>>,
-        // queries_sym_merkle_proof: Vec<Proof<[u8; 32]>>
+        root: [u8; 32],
+        queries: Vec<Query<F>>,
     ) -> Self {
         Self {
-            merkle_root,
-            queries_eval,
-            // queries_merkle_proof,
-            queries_sym_eval,
-            // queries_sym_merkle_proof
+            root,
+            queries
         }
     }
 }
@@ -61,6 +74,10 @@ pub fn commit_and_fold<F>(
 
     // commit to evaluations
     let (eval, root) = commit(&polynomial, domain_size, &offset, transcript);
+    println!(
+        "Layer 0: appending root of composition polynomial (degree {:?}) to transcript.",
+         polynomial.degree()
+    );
 
      // sample queries
     let query_indices = sample_queries(num_queries, domain_size, transcript);
@@ -74,15 +91,12 @@ pub fn commit_and_fold<F>(
     fri_layers.push(
         FriLayer::<F>::new(
             root,
-            vec![FieldElement::<F>::from(0_u64)],
-            // vec![Proof { merkle_path [0u8; 32]}],
-            vec![FieldElement::<F>::from(0_u64)],
-            // vec![Proof { merkle_path [0u8; 32]}],
+            vec![Query::<F>::new(1, FieldElement::one(), FieldElement::one())]
         )
     );
 
     // recursive foldings
-    for _ in 1..number_of_layers {
+    for layer in 1..number_of_layers {
         let beta = transcript.sample_field_element();
     
         polynomial = poly::fold_polynomial(&polynomial, &beta);
@@ -90,13 +104,16 @@ pub fn commit_and_fold<F>(
         offset = offset.square();
 
         let (eval, root) = commit(&polynomial, domain_size, &offset, transcript);
+        println!(
+            "Layer {:?}: appending root of folded polynomial (degree {:?}) to transcript.",
+            layer,
+            polynomial.degree()
+        );
+
         fri_layers.push(
             FriLayer::<F>::new(
                 root,
-                vec![FieldElement::<F>::from(0_u64)],
-                // vec![Proof { merkle_path [0u8; 32]}],
-                vec![FieldElement::<F>::from(0_u64)],
-                // vec![Proof { merkle_path [0u8; 32]}],
+                vec![Query::<F>::new(1, FieldElement::one(), FieldElement::one())]
             )
         );
     }
@@ -127,6 +144,7 @@ fn commit<F>(
     
     let merkle_tree = MerkleTree::<Keccak256Backend<F>>::build(&eval);
     transcript.append_bytes(&merkle_tree.root);
+
     (eval, merkle_tree.root)
 }
 

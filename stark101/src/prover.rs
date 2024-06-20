@@ -24,6 +24,7 @@ type F = Stark252PrimeField;
 type FE = FieldElement<F>;
 
 pub fn generate_proof(public_input: PublicInput<F>) {
+    println!("####### Prover ######\n");
     // ===================================
     // ==========|    Part 1:   |=========
     // === Statement, LDE & Commitment ===
@@ -46,6 +47,7 @@ pub fn generate_proof(public_input: PublicInput<F>) {
     transcript.append_bytes(&num_queries.to_be_bytes());
     transcript.append_bytes(&fib_squared_0.to_bytes_be());
     transcript.append_bytes(&fib_squared_1022.to_bytes_be());
+    println!("Appending public inputs to transcript.");
 
     // define example parameters
     let one = FE::one();
@@ -92,6 +94,7 @@ pub fn generate_proof(public_input: PublicInput<F>) {
     // commit to the trace evaluations over the larger domain using a merkle tree
     let trace_poly_merkle_tree = MerkleTree::<Keccak256Backend<F>>::build(&trace_eval);
     transcript.append_bytes(&trace_poly_merkle_tree.root);
+    println!("Appending root of trace polynomial to transcript.");
 
     // ===================================
     // =========|    Part 2:   |==========
@@ -173,7 +176,7 @@ pub fn generate_proof(public_input: PublicInput<F>) {
     // =========|    Part 4:   |==========
     // ========= FRI Commitment ==========
     // ===================================
-    println!("{:?}", transcript.state());
+    // println!("{:?}", transcript.state());
     let (fri_layers, constant_poly) = fri::commit_and_fold(
         &comp_poly,
         eval_dom_size,
@@ -181,6 +184,6 @@ pub fn generate_proof(public_input: PublicInput<F>) {
         num_queries,
         &mut transcript
     );
-    println!("{:?}", transcript.state());
+    // println!("{:?}", transcript.state());
 
 }
