@@ -17,6 +17,11 @@ use lambdaworks_math::unsigned_integer::element::U256;
 
 use crate::poly;
 
+pub struct InclusionProof<F: IsField> (
+    pub FieldElement<F>,
+    pub Proof<[u8; 32]>
+);
+
 #[derive(Clone)]
 pub struct ValidationData<F: IsField> {
     proof: Proof<[u8; 32]>,
@@ -28,6 +33,34 @@ pub struct ValidationData<F: IsField> {
 pub struct FriLayer<F: IsField> {
     root: [u8; 32],
     queries: Vec<ValidationData<F>>,
+}
+
+pub fn trace_inclusion_proofs<F>(
+        query_indices: &Vec<usize>,
+        domain_size: usize,
+        trace_poly_eval: &[FieldElement<F>],
+        trace_poly_tree: &MerkleTree<Keccak256Backend<F>>,
+        transcript: &mut DefaultTranscript<F>,
+    ) -> Vec<[InclusionProof<F>; 3]> 
+    where
+        F: IsField + IsFFTField,
+        FieldElement<F>: AsBytes + ByteConversion + Sync + Send {
+
+    query_indices
+        .iter()
+        .map(|i|{
+            let idx = i.to_owned();
+            let idx1 = (idx + 1) % domain_size;
+            let idx2 = (idx + 2) % domain_size;
+            transcript.append_bytes(&idx.to_be_bytes());
+            
+            [
+            InclusionProof(trace_poly_eval[idx].to_owned(), trace_poly_tree.get_proof_by_pos(idx).unwrap()),
+            InclusionProof(trace_poly_eval[idx1].to_owned(), trace_poly_tree.get_proof_by_pos(idx1).unwrap()),
+            InclusionProof(trace_poly_eval[idx2].to_owned(), trace_poly_tree.get_proof_by_pos(idx2).unwrap())
+            ]
+        })
+        .collect()
 }
 
 pub fn commit_and_fold<F>(
@@ -54,16 +87,13 @@ pub fn commit_and_fold<F>(
          polynomial.degree()
     );
 
-    // get queries evaluations,add to transcript and generate inclusion proofs
-    println!("\t Appending query indices to transcript.");
-    // append layer
+    // Generate inclusion proofs, validation data and append to layer
     fri_layers.push(
         FriLayer {
             root: tree.root,
             queries: query_indices.iter().map(|i| { 
                 let idx = i.to_owned();
                 let sym_idx = (idx + domain_size / 2) % domain_size;
-                transcript.append_bytes(&idx.to_be_bytes());
         
                 ValidationData {
                     proof: tree.get_proof_by_pos(idx).unwrap(),

@@ -15,7 +15,7 @@ use lambdaworks_crypto::fiat_shamir::{
 };
 
 use crate::poly;
-use crate::common::PublicInput;
+use crate::common::{PublicInput, StarkProof};
 use crate::fri;
 
 // the stark252 field has 2-adicity of 192, i.e., the largest
@@ -23,7 +23,7 @@ use crate::fri;
 type F = Stark252PrimeField;
 type FE = FieldElement<F>;
 
-pub fn generate_proof(public_input: PublicInput<F>) {
+pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     println!(
         "
         ===================================
@@ -93,13 +93,13 @@ pub fn generate_proof(public_input: PublicInput<F>) {
     // the offset is obtained as an outside not in the interpolation domain
     let offset = FE::from(2_u64);
     assert!(offset.pow(int_dom_size as u64) != one);
-    let trace_eval = Polynomial::evaluate_offset_fft::<F>(
+    let trace_poly_eval = Polynomial::evaluate_offset_fft::<F>(
         &trace_poly, 1, Some(eval_dom_size), &offset
     ).unwrap();
 
     // commit to the trace evaluations over the larger domain using a merkle tree
-    let trace_poly_merkle_tree = MerkleTree::<Keccak256Backend<F>>::build(&trace_eval);
-    transcript.append_bytes(&trace_poly_merkle_tree.root);
+    let trace_poly_tree = MerkleTree::<Keccak256Backend<F>>::build(&trace_poly_eval);
+    transcript.append_bytes(&trace_poly_tree.root);
     println!("Appending root of trace polynomial to transcript.");
 
     // ===================================
@@ -182,10 +182,18 @@ pub fn generate_proof(public_input: PublicInput<F>) {
     // =========|    Part 4:   |==========
     // ========= FRI Commitment ==========
     // ===================================
-    //  // sample queries
+    // get queries evaluations and add to transcript
     let query_indices = fri::sample_queries(num_queries, eval_dom_size, &mut transcript);
-    println!("Sampling Query indices: {:?}", query_indices);
+    println!("Sampling Query indices and appending to transcript: {:?}", query_indices);
+    let trace_poly_incl_proofs = fri::trace_inclusion_proofs(
+        &query_indices,
+        eval_dom_size,
+        &trace_poly_eval,
+        &trace_poly_tree,
+        &mut transcript
+    );
     
+    // build fri layers
     let fri_layers = fri::commit_and_fold(
         &comp_poly,
         eval_dom_size,
@@ -193,5 +201,10 @@ pub fn generate_proof(public_input: PublicInput<F>) {
         query_indices,
         &mut transcript
     );
+
+    StarkProof {
+        trace_root: trace_poly_tree.root,
+        fri_layers
+    }
 
 }
