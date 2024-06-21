@@ -51,7 +51,7 @@ fn main() {
 
     // simulate invalid proof
     let mut invalid_proof = proof.clone();
-    invalid_proof.0[0] += 1;
+    invalid_proof.0.0[0] += 1;
 
     if verifier::verify_proof(public_input.clone(), proof) {
         println!("Valid Proof: successfully verified.");

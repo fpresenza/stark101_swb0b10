@@ -32,9 +32,14 @@ pub struct InclusionProof<F: IsField> (
 );
 
 #[derive(Clone)]
-pub struct StarkProof<F: IsField> (
+pub struct PolynomialCommitment<F: IsField> (
 	pub [u8; 32],
 	pub Vec<InclusionProof<F>>,
+);
+
+#[derive(Clone)]
+pub struct StarkProof<F: IsField> (
+	pub PolynomialCommitment<F>,
 	pub Vec<FriLayer<F>>
 );
 
