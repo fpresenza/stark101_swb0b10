@@ -94,13 +94,8 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
     let query_indices = common::sample_queries(num_queries, eval_dom_size, &mut transcript);
     println!("Sampling Query indices and appending to transcript: {:?}", query_indices);
 
-    // extract composition polynomial proofs from layers
-    let comp_poly_root = fri_layers[0].root;
-    let comp_poly_proofs = fri_layers[0].validation_data.iter().map(|data| data.proof.to_owned());
-    let poly_roots = trace_poly_proofs.iter().zip(comp_poly_proofs);
-
     // verify trace inclusion proofs
-    for (index, (t_proof, cp_proof)) in query_indices.iter().zip(poly_roots) {
+    for (index, t_proof) in query_indices.iter().zip(trace_poly_proofs) {
         let result = t_proof
             .iter()
             .enumerate()
@@ -111,7 +106,7 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
                     &eval
                 )
             })
-            .fold(true, |agg, res| {agg && res});
+            .fold(true, |res, valid| {res && valid});
         if !result {
             println!("Verification of trace polynomial inclusion proofs did not pass");
             return false
@@ -129,17 +124,6 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
                     (x0 - g_to_the_1023) / 
                     (x0.pow(1024_u64) - one)
             );
-
-
-        let result = cp_proof.verify::<Keccak256Backend<F>>(
-            &comp_poly_root,
-            index.to_owned(),
-            &cp_eval
-        );
-        if !result {
-            println!("Verification of composition polynomial inclusion proofs did not pass");
-            return false
-        }
     }
 
     // verify composition polynomial inclusion proofs
