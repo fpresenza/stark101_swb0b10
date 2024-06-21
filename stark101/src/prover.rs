@@ -187,10 +187,10 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     println!("Sampling Query indices and appending to transcript: {:?}", query_indices);
     let trace_poly_incl_proofs = common::generate_inclusion_proofs(
         &query_indices,
+        vec![0_usize, 8, 16],
         eval_dom_size,
         &trace_poly_eval,
         &trace_poly_tree,
-        &mut transcript
     );
     
     // build fri layers
