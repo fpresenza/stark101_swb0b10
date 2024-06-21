@@ -57,7 +57,7 @@ pub fn sample_queries<F>(
 }
 
 pub fn generate_inclusion_proofs<F>(
-        indices: &Vec<usize>,
+        indices: &[usize],
         poly_eval: &[FieldElement<F>],
         poly_tree: &MerkleTree<Keccak256Backend<F>>,
     ) -> Vec<InclusionProof<F>> 
@@ -74,7 +74,7 @@ pub fn generate_inclusion_proofs<F>(
 }
 
 pub fn verify_inclusion_proofs<F>(
-        indices: &Vec<usize>,
+        indices: &[usize],
         proofs: &Vec<InclusionProof<F>>,
         root: [u8; 32],
     ) -> bool
@@ -89,7 +89,7 @@ pub fn verify_inclusion_proofs<F>(
             proof.verify::<Keccak256Backend<F>>(
                 &root,
                 *index,
-                &eval
+                eval
             )
         }).all(|valid| valid)
 }

@@ -100,11 +100,11 @@ pub fn commit_and_fold<F>(
 }
 
 pub fn decommit_and_fold<F>(
-        layers: &Vec<FriLayer<F>>,
+        layers: &[FriLayer<F>],
         domain_size: &usize,
-        query_indices: &Vec<usize>,
-        queries: &Vec<FieldElement<F>>,
-        query_evals: &Vec<FieldElement<F>>,
+        query_indices: &[usize],
+        queries: &[FieldElement<F>],
+        query_evals: &[FieldElement<F>],
         transcript: &mut DefaultTranscript<F>
     ) -> bool
     where
@@ -112,9 +112,8 @@ pub fn decommit_and_fold<F>(
         FieldElement<F>: AsBytes + ByteConversion + Sync + Send {
 
     let mut domain_size = domain_size.to_owned();
-    let query_indices = query_indices.clone();
-    let mut queries = queries.clone();
-    let mut query_evals = query_evals.clone();
+    let mut queries = queries.to_owned();
+    let mut query_evals = query_evals.to_owned();
     let mut sym_evals = Vec::<FieldElement<F>>::with_capacity(query_evals.len());
 
     // commit to evaluations

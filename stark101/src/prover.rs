@@ -176,7 +176,7 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     // ===================================
     // get queries evaluations and add to transcript
     let query_indices = common::sample_queries(num_queries, eval_dom_size, &mut transcript);
-    let aux_indices = vec![0_usize, 8, 16];
+    let aux_indices = [0_usize, 8, 16];
     let all_indices = query_indices
         .iter()
         .map(|i| {
