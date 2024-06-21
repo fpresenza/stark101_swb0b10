@@ -13,15 +13,8 @@ use lambdaworks_crypto::fiat_shamir::{
     is_transcript::IsTranscript,
     default_transcript::DefaultTranscript
 };
-use lambdaworks_math::unsigned_integer::element::U256;
 
 use crate::poly;
-
-#[derive(Clone)]
-pub struct InclusionProof<F: IsField> (
-    pub FieldElement<F>,
-    pub Proof<[u8; 32]>
-);
 
 #[derive(Clone)]
 pub struct ValidationData<F: IsField> {
@@ -34,34 +27,6 @@ pub struct ValidationData<F: IsField> {
 pub struct FriLayer<F: IsField> {
     root: [u8; 32],
     queries: Vec<ValidationData<F>>,
-}
-
-pub fn trace_inclusion_proofs<F>(
-        query_indices: &Vec<usize>,
-        domain_size: usize,
-        trace_poly_eval: &[FieldElement<F>],
-        trace_poly_tree: &MerkleTree<Keccak256Backend<F>>,
-        transcript: &mut DefaultTranscript<F>,
-    ) -> Vec<[InclusionProof<F>; 3]> 
-    where
-        F: IsField + IsFFTField,
-        FieldElement<F>: AsBytes + ByteConversion + Sync + Send {
-
-    query_indices
-        .iter()
-        .map(|i|{
-            let idx = i.to_owned();
-            let idx1 = (idx + 1) % domain_size;
-            let idx2 = (idx + 2) % domain_size;
-            transcript.append_bytes(&idx.to_be_bytes());
-            
-            [
-            InclusionProof(trace_poly_eval[idx].to_owned(), trace_poly_tree.get_proof_by_pos(idx).unwrap()),
-            InclusionProof(trace_poly_eval[idx1].to_owned(), trace_poly_tree.get_proof_by_pos(idx1).unwrap()),
-            InclusionProof(trace_poly_eval[idx2].to_owned(), trace_poly_tree.get_proof_by_pos(idx2).unwrap())
-            ]
-        })
-        .collect()
 }
 
 pub fn commit_and_fold<F>(
@@ -171,22 +136,4 @@ fn fold<F: IsField>(
     (poly::fold_polynomial(&polynomial, &beta),
     domain_size / 2,
     offset.square())
-}
-
-pub fn sample_queries<F>(
-        num_queries: usize,
-        domain_size: usize,
-        transcript: &mut DefaultTranscript<F>
-    ) -> Vec<usize> 
-    where 
-        F: IsField,
-        FieldElement<F>: AsBytes + ByteConversion {
-
-        (0..num_queries)
-        .map(|_| {
-            let query_index = U256::from_bytes_be(&transcript.sample()).unwrap();
-            let(_, query_index) = query_index.div_rem(&U256::from(domain_size as u64));
-            query_index.limbs[3] as usize
-        })
-        .collect::<Vec<usize>>()
 }

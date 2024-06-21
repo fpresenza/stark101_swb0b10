@@ -15,7 +15,7 @@ use lambdaworks_crypto::fiat_shamir::{
 };
 
 use crate::poly;
-use crate::common::{PublicInput, StarkProof};
+use crate::common::{self, PublicInput, StarkProof};
 use crate::fri;
 
 // the stark252 field has 2-adicity of 192, i.e., the largest
@@ -183,9 +183,9 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     // ========= FRI Commitment ==========
     // ===================================
     // get queries evaluations and add to transcript
-    let query_indices = fri::sample_queries(num_queries, eval_dom_size, &mut transcript);
+    let query_indices = common::sample_queries(num_queries, eval_dom_size, &mut transcript);
     println!("Sampling Query indices and appending to transcript: {:?}", query_indices);
-    let trace_poly_incl_proofs = fri::trace_inclusion_proofs(
+    let trace_poly_incl_proofs = common::trace_inclusion_proofs(
         &query_indices,
         eval_dom_size,
         &trace_poly_eval,
