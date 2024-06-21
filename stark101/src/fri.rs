@@ -137,11 +137,9 @@ fn fold<F: IsField>(
         offset: FieldElement<F>,
         beta: FieldElement<F>
     ) -> (Polynomial<FieldElement<F>>, usize, FieldElement<F>) {
-    (
-        poly::fold_polynomial(&polynomial, &beta),
-        domain_size / 2,
-        offset.square()
-    )
+    (poly::fold_polynomial(&polynomial, &beta),
+    domain_size / 2,
+    offset.square())
 }
 
 pub fn sample_queries<F>(
