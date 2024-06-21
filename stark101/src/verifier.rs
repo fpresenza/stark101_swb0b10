@@ -93,6 +93,7 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
     // get queries evaluations and add to transcript
     let query_indices = common::sample_queries(num_queries, eval_dom_size, &mut transcript);
     let aux_indices = vec![0_usize, 8, 16];
+    let aux_indices_len = aux_indices.len();
     let all_indices = query_indices
         .iter()
         .map(|i| {
@@ -110,22 +111,27 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
         return false
     }
 
-    // for (index, t_proof) in query_indices.iter().zip(trace_poly_proofs) {
-    //     let t = [t_proof[0].0, t_proof[1].0, t_proof[2].0];
-    //     let x0 = offset * w.pow(index.to_owned());
-    //     let cp_eval = 
-    //         a * (t[0] - fib_squared_0) / (x0 - one) +
-    //         b * (t[0] - fib_squared_1022) / (x0 - g_to_the_1022) +
-    //         c * (
-    //                 (t[2] - t[1].square() - t[0].square()) * 
-    //                 (x0 - g_to_the_1021) * 
-    //                 (x0 - g_to_the_1022) * 
-    //                 (x0 - g_to_the_1023) / 
-    //                 (x0.pow(1024_u64) - one)
-    //         );
-    // }
+    // compute composition polynomial evaluations
+    let comp_poly_query_evals = query_indices
+        .iter()
+        .enumerate()
+        .map(|(i, idx)| {
+            let x0 = offset * w.pow(idx.to_owned());
+            let t = (0..aux_indices_len).map(|k| {
+                trace_poly_proofs[aux_indices_len * i + k].0
+            }).collect::<Vec<FE>>();
+            a * (t[0] - fib_squared_0) / (x0 - one) +
+            b * (t[0] - fib_squared_1022) / (x0 - g_to_the_1022) +
+            c * (
+                    (t[2] - t[1].square() - t[0].square()) * 
+                    (x0 - g_to_the_1021) * 
+                    (x0 - g_to_the_1022) * 
+                    (x0 - g_to_the_1023) / 
+                    (x0.pow(1024_u64) - one)
+            )
+        }).collect::<Vec<FE>>();
 
-    // verify composition polynomial inclusion proofs
+    // println!("{:?}", comp_poly_query_evals[2]);
 
     // ===================================
     // =========|    Part 3:   |==========
