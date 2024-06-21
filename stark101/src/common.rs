@@ -74,7 +74,7 @@ pub fn generate_inclusion_proofs<F>(
             let idx = i.to_owned();
             let idx1 = (idx + 8) % domain_size;
             let idx2 = (idx + 16) % domain_size;
-            transcript.append_bytes(&idx.to_be_bytes());
+            
             
             [
             InclusionProof(poly_eval[idx].to_owned(), poly_tree.get_proof_by_pos(idx).unwrap()),
