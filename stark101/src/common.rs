@@ -57,11 +57,11 @@ pub fn sample_queries<F>(
         .collect::<Vec<usize>>()
 }
 
-pub fn trace_inclusion_proofs<F>(
+pub fn generate_inclusion_proofs<F>(
         query_indices: &Vec<usize>,
         domain_size: usize,
-        trace_poly_eval: &[FieldElement<F>],
-        trace_poly_tree: &MerkleTree<Keccak256Backend<F>>,
+        poly_eval: &[FieldElement<F>],
+        poly_tree: &MerkleTree<Keccak256Backend<F>>,
         transcript: &mut DefaultTranscript<F>,
     ) -> Vec<[InclusionProof<F>; 3]> 
     where
@@ -72,14 +72,14 @@ pub fn trace_inclusion_proofs<F>(
         .iter()
         .map(|i|{
             let idx = i.to_owned();
-            let idx1 = (idx + 1) % domain_size;
-            let idx2 = (idx + 2) % domain_size;
+            let idx1 = (idx + 8) % domain_size;
+            let idx2 = (idx + 16) % domain_size;
             transcript.append_bytes(&idx.to_be_bytes());
             
             [
-            InclusionProof(trace_poly_eval[idx].to_owned(), trace_poly_tree.get_proof_by_pos(idx).unwrap()),
-            InclusionProof(trace_poly_eval[idx1].to_owned(), trace_poly_tree.get_proof_by_pos(idx1).unwrap()),
-            InclusionProof(trace_poly_eval[idx2].to_owned(), trace_poly_tree.get_proof_by_pos(idx2).unwrap())
+            InclusionProof(poly_eval[idx].to_owned(), poly_tree.get_proof_by_pos(idx).unwrap()),
+            InclusionProof(poly_eval[idx1].to_owned(), poly_tree.get_proof_by_pos(idx1).unwrap()),
+            InclusionProof(poly_eval[idx2].to_owned(), poly_tree.get_proof_by_pos(idx2).unwrap())
             ]
         })
         .collect()

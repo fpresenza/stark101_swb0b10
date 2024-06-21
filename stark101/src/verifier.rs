@@ -23,7 +23,7 @@ use crate::fri::{self, FriLayer};
 type F = Stark252PrimeField;
 type FE = FieldElement<F>;
 
-pub fn verify_proof(public_input: PublicInput<F>, proof: StarkProof<F>) -> bool {
+pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) -> bool {
     println!(
         "
         ===================================
@@ -47,9 +47,9 @@ pub fn verify_proof(public_input: PublicInput<F>, proof: StarkProof<F>) -> bool 
 
     let StarkProof(
         trace_poly_tree_root,
-        trace_poly_incl_proofs,
+        trace_poly_proofs,
         fri_layers
-    ) = proof;
+    ) = stark_proof;
 
     // initialize transcript and append all public inputs
     let mut transcript = DefaultTranscript::<F>::new(&[]);
@@ -76,6 +76,8 @@ pub fn verify_proof(public_input: PublicInput<F>, proof: StarkProof<F>) -> bool 
     let g_to_the_1022 = g * g_to_the_1021;
     let g_to_the_1023 = g * g_to_the_1022;
 
+    let power_of_two = usize::BITS - eval_dom_size.leading_zeros() - 1;
+    let w = F::get_primitive_root_of_unity(power_of_two as u64).unwrap();
 
     transcript.append_bytes(&trace_poly_tree_root);
     println!("Appending root of trace polynomial to transcript.");
@@ -87,27 +89,53 @@ pub fn verify_proof(public_input: PublicInput<F>, proof: StarkProof<F>) -> bool 
     let a = transcript.sample_field_element();
     let b = transcript.sample_field_element();
     let c = transcript.sample_field_element();
-    // println!("a = {:?}", a);
-    // println!("b = {:?}", b);
-    // println!("c = {:?}", c);
 
     // get queries evaluations and add to transcript
     let query_indices = common::sample_queries(num_queries, eval_dom_size, &mut transcript);
     println!("Sampling Query indices and appending to transcript: {:?}", query_indices);
 
+    // extract composition polynomial proofs from layers
+    let comp_poly_root = fri_layers[0].root;
+    let comp_poly_proofs = fri_layers[0].validation_data.iter().map(|data| data.proof.to_owned());
+    let poly_roots = trace_poly_proofs.iter().zip(comp_poly_proofs);
+
     // verify trace inclusion proofs
-    for (index, incl_proof) in query_indices.iter().zip(trace_poly_incl_proofs) {
-        let result = incl_proof
+    for (index, (t_proof, cp_proof)) in query_indices.iter().zip(poly_roots) {
+        let result = t_proof
             .iter()
             .enumerate()
             .map(|(k, InclusionProof(eval, proof))| {
                 proof.verify::<Keccak256Backend<F>>(
                     &trace_poly_tree_root,
-                    (index + k) % eval_dom_size,
+                    (index + 8*k) % eval_dom_size,
                     &eval
                 )
             })
             .fold(true, |agg, res| {agg && res});
+        if !result {
+            println!("Verification of trace polynomial inclusion proofs did not pass");
+            return false
+        }
+
+        let t = [t_proof[0].0, t_proof[1].0, t_proof[2].0];
+        let x0 = offset * w.pow(index.to_owned());
+        let cp_eval = 
+            a * (t[0] - fib_squared_0) / (x0 - one) +
+            b * (t[0] - fib_squared_1022) / (x0 - g_to_the_1022) +
+            c * (
+                    (t[2] - t[1].square() - t[0].square()) * 
+                    (x0 - g_to_the_1021) * 
+                    (x0 - g_to_the_1022) * 
+                    (x0 - g_to_the_1023) / 
+                    (x0.pow(1024_u64) - one)
+            );
+
+
+        let result = cp_proof.verify::<Keccak256Backend<F>>(
+            &comp_poly_root,
+            index.to_owned(),
+            &cp_eval
+        );
         if !result {
             println!("Verification of composition polynomial inclusion proofs did not pass");
             return false
@@ -115,15 +143,11 @@ pub fn verify_proof(public_input: PublicInput<F>, proof: StarkProof<F>) -> bool 
     }
 
     // verify composition polynomial inclusion proofs
-    
-
 
     // ===================================
     // =========|    Part 3:   |==========
-    // ========= FRI Commitment ==========
+    // ========= FRI Decommitment ==========
     // ===================================
-
-
 
     true
 }
