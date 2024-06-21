@@ -35,7 +35,7 @@ pub struct InclusionProof<F: IsField> (
 #[derive(Clone)]
 pub struct StarkProof<F: IsField> (
 	pub [u8; 32],
-	pub Vec<Vec<InclusionProof<F>>>,
+	pub Vec<InclusionProof<F>>,
 	pub Vec<FriLayer<F>>
 );
 
@@ -58,27 +58,39 @@ pub fn sample_queries<F>(
 }
 
 pub fn generate_inclusion_proofs<F>(
-        query_indices: &Vec<usize>,
-        aux_indices: Vec<usize>,
-        domain_size: usize,
+        indices: &Vec<usize>,
         poly_eval: &[FieldElement<F>],
         poly_tree: &MerkleTree<Keccak256Backend<F>>,
-    ) -> Vec<Vec<InclusionProof<F>>> 
+    ) -> Vec<InclusionProof<F>> 
     where
         F: IsField + IsFFTField,
         FieldElement<F>: AsBytes + ByteConversion + Sync + Send {
 
-    query_indices
+    indices
         .iter()
-        .map(|i|{
-
-        	aux_indices
-        	   	.iter()
-        		.map(|j| {
-        			let idx = (i + j) % domain_size;
-        			InclusionProof(poly_eval[idx].to_owned(), poly_tree.get_proof_by_pos(idx).unwrap())
-        		})
-        		.collect()
+        .map(|i| {
+        	InclusionProof(poly_eval[*i].to_owned(), poly_tree.get_proof_by_pos(*i).unwrap())
         })
         .collect()
+}
+
+pub fn verify_inclusion_proofs<F>(
+        indices: &Vec<usize>,
+        proofs: &Vec<InclusionProof<F>>,
+        root: [u8; 32],
+    ) -> bool
+    where
+        F: IsField + IsFFTField,
+        FieldElement<F>: AsBytes + ByteConversion + Sync + Send {
+
+    indices
+        .iter()
+        .zip(proofs)
+        .map(|(index, InclusionProof(eval, proof))| {
+            proof.verify::<Keccak256Backend<F>>(
+                &root,
+                *index,
+                &eval
+            )
+        }).fold(true, |acc, valid| {acc && valid})
 }

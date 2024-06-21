@@ -184,11 +184,20 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     // ===================================
     // get queries evaluations and add to transcript
     let query_indices = common::sample_queries(num_queries, eval_dom_size, &mut transcript);
+    let aux_indices = vec![0_usize, 8, 16];
+    let all_indices = query_indices
+        .iter()
+        .map(|i| {
+            aux_indices
+                .iter()
+                .map(|j| (i + j) % eval_dom_size)
+                .collect::<Vec<usize>>()
+    }).collect::<Vec<Vec<usize>>>()
+    .concat();
     println!("Sampling Query indices and appending to transcript: {:?}", query_indices);
+
     let trace_poly_incl_proofs = common::generate_inclusion_proofs(
-        &query_indices,
-        vec![0_usize, 8, 16],
-        eval_dom_size,
+        &all_indices,
         &trace_poly_eval,
         &trace_poly_tree,
     );

@@ -46,7 +46,7 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
     ) = public_input;
 
     let StarkProof(
-        trace_poly_tree_root,
+        trace_poly_root,
         trace_poly_proofs,
         fri_layers
     ) = stark_proof;
@@ -79,7 +79,7 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
     let power_of_two = usize::BITS - eval_dom_size.leading_zeros() - 1;
     let w = F::get_primitive_root_of_unity(power_of_two as u64).unwrap();
 
-    transcript.append_bytes(&trace_poly_tree_root);
+    transcript.append_bytes(&trace_poly_root);
     println!("Appending root of trace polynomial to transcript.");
 
     // ===================================
@@ -92,39 +92,38 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
 
     // get queries evaluations and add to transcript
     let query_indices = common::sample_queries(num_queries, eval_dom_size, &mut transcript);
+    let aux_indices = vec![0_usize, 8, 16];
+    let all_indices = query_indices
+        .iter()
+        .map(|i| {
+            aux_indices
+                .iter()
+                .map(|j| (i + j) % eval_dom_size)
+                .collect::<Vec<usize>>()
+    }).collect::<Vec<Vec<usize>>>()
+    .concat();
     println!("Sampling Query indices and appending to transcript: {:?}", query_indices);
 
     // verify trace inclusion proofs
-    for (index, t_proof) in query_indices.iter().zip(trace_poly_proofs) {
-        let result = t_proof
-            .iter()
-            .enumerate()
-            .map(|(k, InclusionProof(eval, proof))| {
-                proof.verify::<Keccak256Backend<F>>(
-                    &trace_poly_tree_root,
-                    (index + 8*k) % eval_dom_size,
-                    &eval
-                )
-            })
-            .fold(true, |res, valid| {res && valid});
-        if !result {
-            println!("Verification of trace polynomial inclusion proofs did not pass");
-            return false
-        }
-
-        let t = [t_proof[0].0, t_proof[1].0, t_proof[2].0];
-        let x0 = offset * w.pow(index.to_owned());
-        let cp_eval = 
-            a * (t[0] - fib_squared_0) / (x0 - one) +
-            b * (t[0] - fib_squared_1022) / (x0 - g_to_the_1022) +
-            c * (
-                    (t[2] - t[1].square() - t[0].square()) * 
-                    (x0 - g_to_the_1021) * 
-                    (x0 - g_to_the_1022) * 
-                    (x0 - g_to_the_1023) / 
-                    (x0.pow(1024_u64) - one)
-            );
+    if !common::verify_inclusion_proofs(&all_indices, &trace_poly_proofs, trace_poly_root) {
+        println!("Verification of trace polynomial inclusion proofs did not pass");
+        return false
     }
+
+    // for (index, t_proof) in query_indices.iter().zip(trace_poly_proofs) {
+    //     let t = [t_proof[0].0, t_proof[1].0, t_proof[2].0];
+    //     let x0 = offset * w.pow(index.to_owned());
+    //     let cp_eval = 
+    //         a * (t[0] - fib_squared_0) / (x0 - one) +
+    //         b * (t[0] - fib_squared_1022) / (x0 - g_to_the_1022) +
+    //         c * (
+    //                 (t[2] - t[1].square() - t[0].square()) * 
+    //                 (x0 - g_to_the_1021) * 
+    //                 (x0 - g_to_the_1022) * 
+    //                 (x0 - g_to_the_1023) / 
+    //                 (x0.pow(1024_u64) - one)
+    //         );
+    // }
 
     // verify composition polynomial inclusion proofs
 
