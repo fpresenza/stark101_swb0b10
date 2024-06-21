@@ -4,7 +4,7 @@ use lambdaworks_math::field::{
     element::FieldElement
 };
 
-use crate::fri::FriLayer;
+use crate::fri::{InclusionProof, FriLayer};
 
 #[derive(Clone)]
 pub struct PublicInput<F: IsField> (
@@ -17,8 +17,9 @@ pub struct PublicInput<F: IsField> (
 );
 
 #[derive(Clone)]
-pub struct StarkProof<F: IsField> {
-	pub trace_root: [u8; 32],
-	pub fri_layers: Vec<FriLayer<F>>
-}
+pub struct StarkProof<F: IsField> (
+	pub [u8; 32],
+	pub Vec<[InclusionProof<F>; 3]>,
+	pub Vec<FriLayer<F>>
+);
 

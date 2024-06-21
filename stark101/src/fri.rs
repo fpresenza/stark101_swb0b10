@@ -17,6 +17,7 @@ use lambdaworks_math::unsigned_integer::element::U256;
 
 use crate::poly;
 
+#[derive(Clone)]
 pub struct InclusionProof<F: IsField> (
     pub FieldElement<F>,
     pub Proof<[u8; 32]>

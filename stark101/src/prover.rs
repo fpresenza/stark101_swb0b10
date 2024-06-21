@@ -202,9 +202,10 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
         &mut transcript
     );
 
-    StarkProof {
-        trace_root: trace_poly_tree.root,
+    StarkProof (
+        trace_poly_tree.root,
+        trace_poly_incl_proofs,
         fri_layers
-    }
+    )
 
 }
