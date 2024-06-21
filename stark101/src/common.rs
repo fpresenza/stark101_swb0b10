@@ -10,7 +10,6 @@ use lambdaworks_crypto::merkle_tree::{
     proof::Proof
 };
 use lambdaworks_crypto::fiat_shamir::{
-    is_transcript::IsTranscript,
     default_transcript::DefaultTranscript
 };
 
@@ -92,5 +91,5 @@ pub fn verify_inclusion_proofs<F>(
                 *index,
                 &eval
             )
-        }).fold(true, |acc, valid| {acc && valid})
+        }).all(|valid| valid)
 }
