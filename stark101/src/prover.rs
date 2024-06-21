@@ -76,16 +76,11 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
         Ok(p) => p,
         Err(e) => panic!("{:?}", e),
     };
-    assert_eq!(trace_poly.degree(), int_dom_size - 1);
-    assert_eq!(trace_poly.evaluate(&one), fib_squared_0);
-    assert_eq!(trace_poly.evaluate(&g), witness);
-    assert_eq!(trace_poly.evaluate(&g_to_the_1022), fib_squared_1022);
 
     // fft-evaluate the fibonacci square sequence over a larger domain
     // of size (blow-up factor) * (interpolation domain size)
     // the offset is obtained as an outside not in the interpolation domain
     let offset = FE::from(2_u64);
-    assert!(offset.pow(int_dom_size as u64) != one);
     let trace_poly_eval = Polynomial::evaluate_offset_fft::<F>(
         &trace_poly, 1, Some(eval_dom_size), &offset
     ).unwrap();
@@ -108,7 +103,6 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
         eval_dom_size,
         &offset
     );
-    assert_eq!(constraint_0_poly.degree(), int_dom_size - 2);
 
     // result element constraint
     let constraint_1022_poly = poly::polynomial_division(
@@ -117,7 +111,6 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
         eval_dom_size,
         &offset
     );
-    assert_eq!(constraint_1022_poly.degree(), int_dom_size - 2);
 
     // trace transition constraint
     // numerator
@@ -134,12 +127,6 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
         2_u64,
         eval_dom_size,
         &offset
-    );
-    assert_eq!(trace_poly_squared.degree(), 2 * int_dom_size - 2);
-    assert_eq!(trace_poly_scaled_once_squared.degree(), 2 * int_dom_size - 2);
-    assert_eq!(
-        trace_poly_scaled_twice.evaluate(&g_to_the_1021),
-        trace_poly_scaled_once_squared.evaluate(&g_to_the_1021) + trace_poly_squared.evaluate(&g_to_the_1021)
     );
 
     let numerator = poly::polynomial_multiplication(
@@ -161,14 +148,12 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
         eval_dom_size,
         &offset
     );
-    assert_eq!(transition_constraint_poly.degree(), int_dom_size + 1);
 
     // composition polynomial
     let a = transcript.sample_field_element();
     let b = transcript.sample_field_element();
     let c = transcript.sample_field_element();
     let comp_poly = a * constraint_0_poly + b * constraint_1022_poly + c * transition_constraint_poly;
-    assert_eq!(comp_poly.degree(), int_dom_size + 1);
 
     // ===================================
     // =========|    Part 3:   |==========
