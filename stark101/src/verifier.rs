@@ -4,19 +4,13 @@ use lambdaworks_math::field::{
     fields::fft_friendly::stark_252_prime_field::Stark252PrimeField,
     element::FieldElement
 };
-use lambdaworks_math::polynomial::Polynomial;
-use lambdaworks_crypto::merkle_tree::{
-    merkle::MerkleTree,
-    backends::types::Keccak256Backend
-};
 use lambdaworks_crypto::fiat_shamir::{
     is_transcript::IsTranscript,
     default_transcript::DefaultTranscript
 };
 
-use crate::poly;
-use crate::common::{self, PublicInput, InclusionProof, StarkProof};
-use crate::fri::{self, FriLayer};
+use crate::common::{self, PublicInput, StarkProof};
+use crate::fri;
 
 // the stark252 field has 2-adicity of 192, i.e., the largest
 // multiplicative subgroup whose order is a power of two has order 2^192
@@ -24,13 +18,7 @@ type F = Stark252PrimeField;
 type FE = FieldElement<F>;
 
 pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) -> bool {
-    println!(
-        "
-        ===================================
-        =========|   VERIFIER   |==========
-        ===================================
-        "
-    );
+
     // ===================================
     // ==========|    Part 1:   |=========
     // === Statement, LDE & Commitment ===
@@ -59,7 +47,6 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
     transcript.append_bytes(&num_queries.to_be_bytes());
     transcript.append_bytes(&fib_squared_0.to_bytes_be());
     transcript.append_bytes(&fib_squared_1022.to_bytes_be());
-    println!("Appending public inputs to transcript.");
 
     // define example parameters
     let one = FE::one();
@@ -80,7 +67,6 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
     let w = F::get_primitive_root_of_unity(power_of_two as u64).unwrap();
 
     transcript.append_bytes(&trace_poly_root);
-    println!("Appending root of trace polynomial to transcript.");
 
     // ===================================
     // =========|    Part 2:   |==========
@@ -103,11 +89,9 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
                 .collect::<Vec<usize>>()
     }).collect::<Vec<Vec<usize>>>()
     .concat();
-    println!("Sampling Query indices and appending to transcript: {:?}", query_indices);
 
     // verify trace inclusion proofs
     if !common::verify_inclusion_proofs(&all_indices, &trace_poly_proofs, trace_poly_root) {
-        println!("Verification of trace polynomial inclusion proofs did not pass");
         return false
     }
 

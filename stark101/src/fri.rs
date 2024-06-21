@@ -49,10 +49,6 @@ pub fn commit_and_fold<F>(
     // commit to evaluations
     let (eval, tree) = commit(&polynomial, domain_size, &offset);
     transcript.append_bytes(&tree.root);
-    println!(
-        "Layer 0: \n \t Appending root of composition polynomial (degree {:?}) to transcript.",
-         polynomial.degree()
-    );
 
     // Generate inclusion proofs, validation data and append to layer
     fri_layers.push(
@@ -73,19 +69,13 @@ pub fn commit_and_fold<F>(
     );
 
     // recursive foldings
-    for k in 1..=number_of_foldings {
+    for _ in 1..=number_of_foldings {
         let beta = transcript.sample_field_element();
-        println!("Layer {:?}:", k);
-        println!("\t Sampling beta");
 
         (polynomial, domain_size, offset) = fold(polynomial, domain_size, offset, beta);
 
         let (eval, tree) = commit(&polynomial, domain_size, &offset);
         transcript.append_bytes(&tree.root);
-        println!(
-            "\t Appending root of folded polynomial (degree {:?}) to transcript.",
-            polynomial.degree()
-        );
 
         // append layer
         fri_layers.push(
@@ -121,7 +111,7 @@ pub fn decommit_and_fold<F>(
         F: IsField + IsFFTField,
         FieldElement<F>: AsBytes + ByteConversion + Sync + Send {
 
-    let mut domain_size = domain_size.clone();
+    let mut domain_size = domain_size.to_owned();
     let query_indices = query_indices.clone();
     let mut queries = queries.clone();
     let mut query_evals = query_evals.clone();
@@ -130,7 +120,6 @@ pub fn decommit_and_fold<F>(
     // commit to evaluations
     let FriLayer{root, validation_data} = &layers[0];
     transcript.append_bytes(root);
-    println!("Layer 0: \n \t Appending root of composition polynomial to transcript.");
 
     // verify first layer inclusion proofs and get next layer queries
     let num_queries = query_indices.len();
@@ -142,24 +131,18 @@ pub fn decommit_and_fold<F>(
         sym_evals.push(sym_eval.clone());
 
         if !proof.verify::<Keccak256Backend<F>>(root, idx, eval) || !sym_proof.verify::<Keccak256Backend<F>>(root, sym_idx, sym_eval) {
-            println!("Verification of first layer inclusion proofs did not pass");
             return false            
         }
     };
 
     // recursive foldings
-    for (k, layer) in layers.iter().enumerate().skip(1) {
+    for layer in layers.iter().skip(1) {
         let beta = transcript.sample_field_element();
-        println!("Layer {:?}:", k);
-        println!("\t Sampling beta");
         
         domain_size /= 2;
         
         let FriLayer{root, validation_data} = layer;
         transcript.append_bytes(root);
-        println!("\t Appending root of folded polynomial to transcript.");
-
-
 
         for i in 0..num_queries {
             query_evals[i] = curr_layer_query_evals(&queries[i], &query_evals[i], &sym_evals[i], &beta);
@@ -172,7 +155,6 @@ pub fn decommit_and_fold<F>(
             sym_evals[i] = sym_eval.clone();
 
             if !proof.verify::<Keccak256Backend<F>>(root, idx, eval) || !sym_proof.verify::<Keccak256Backend<F>>(root, sym_idx, sym_eval) {
-                println!("\t Verification of layer inclusion proofs for query {:?} did not pass", i);
                 return false            
             }
         }
