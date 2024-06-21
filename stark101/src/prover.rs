@@ -110,22 +110,22 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     let x_to_the_1024 = Polynomial::new_monomial(one, int_dom_size);
 
     // initial element constraint
-    let contraint_0_poly = poly::polynomial_division(
+    let constraint_0_poly = poly::polynomial_division(
         &(&trace_poly - fib_squared_0),
         &(&x - one),
         eval_dom_size,
         &offset
     );
-    assert_eq!(contraint_0_poly.degree(), int_dom_size - 2);
+    assert_eq!(constraint_0_poly.degree(), int_dom_size - 2);
 
     // result element constraint
-    let contraint_1022_poly = poly::polynomial_division(
+    let constraint_1022_poly = poly::polynomial_division(
         &(&trace_poly - fib_squared_1022),
         &(&x - g_to_the_1022),
         eval_dom_size,
         &offset
     );
-    assert_eq!(contraint_1022_poly.degree(), int_dom_size - 2);
+    assert_eq!(constraint_1022_poly.degree(), int_dom_size - 2);
 
     // trace transition constraint
     // numerator
@@ -175,11 +175,11 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     let a = transcript.sample_field_element();
     let b = transcript.sample_field_element();
     let c = transcript.sample_field_element();
-    let comp_poly = a * contraint_0_poly + b * contraint_1022_poly + c * transition_constraint_poly;
+    let comp_poly = a * constraint_0_poly + b * constraint_1022_poly + c * transition_constraint_poly;
     assert_eq!(comp_poly.degree(), int_dom_size + 1);
 
     // ===================================
-    // =========|    Part 4:   |==========
+    // =========|    Part 3:   |==========
     // ========= FRI Commitment ==========
     // ===================================
     // get queries evaluations and add to transcript
