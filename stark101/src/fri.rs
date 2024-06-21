@@ -18,15 +18,15 @@ use crate::poly;
 
 #[derive(Clone)]
 pub struct ValidationData<F: IsField> {
-    proof: Proof<[u8; 32]>,
-    sym_eval: FieldElement<F>,
-    sym_proof: Proof<[u8; 32]>,
+    pub proof: Proof<[u8; 32]>,
+    pub sym_eval: FieldElement<F>,
+    pub sym_proof: Proof<[u8; 32]>,
 }
 
 #[derive(Clone)]
 pub struct FriLayer<F: IsField> {
-    root: [u8; 32],
-    queries: Vec<ValidationData<F>>,
+    pub root: [u8; 32],
+    pub validation_data: Vec<ValidationData<F>>,
 }
 
 pub fn commit_and_fold<F>(
@@ -57,7 +57,7 @@ pub fn commit_and_fold<F>(
     fri_layers.push(
         FriLayer {
             root: tree.root,
-            queries: query_indices.iter().map(|i| { 
+            validation_data: query_indices.iter().map(|i| { 
                 let idx = i.to_owned();
                 let sym_idx = (idx + domain_size / 2) % domain_size;
         
@@ -88,7 +88,7 @@ pub fn commit_and_fold<F>(
         fri_layers.push(
             FriLayer {
                 root: tree.root,
-                queries: query_indices.iter().map(|i| { 
+                validation_data: query_indices.iter().map(|i| { 
                     let idx = i.to_owned() % domain_size;
                     let sym_idx = (idx + domain_size / 2) % domain_size;
         
