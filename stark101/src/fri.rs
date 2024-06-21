@@ -1,3 +1,4 @@
+use lambdaworks_math::field::traits::IsPrimeField;
 use lambdaworks_math::traits::{AsBytes, ByteConversion};
 use lambdaworks_math::field::{
     element::FieldElement,
@@ -37,7 +38,7 @@ pub fn commit_and_fold<F>(
         transcript: &mut DefaultTranscript<F>
     ) -> Vec<FriLayer<F>>
     where
-        F: IsField + IsFFTField,
+        F: IsField + IsFFTField + IsPrimeField,
         FieldElement<F>: AsBytes + ByteConversion + Sync + Send {
 
     let mut polynomial = polynomial.clone();
@@ -72,17 +73,27 @@ pub fn commit_and_fold<F>(
     );
 
     // recursive foldings
-    for layer in 1..=number_of_foldings {
+    for k in 1..=number_of_foldings {
         let beta = transcript.sample_field_element();
+        println!("Layer {:?}:", k);
+        println!("\t beta: {:?}", beta);
+
         (polynomial, domain_size, offset) = fold(polynomial, domain_size, offset, beta);
 
         let (eval, tree) = commit(&polynomial, domain_size, &offset);
         transcript.append_bytes(&tree.root);
         println!(
-            "Layer {:?}: \n \t Appending root of folded polynomial (degree {:?}) to transcript.",
-            layer,
+            "\t Appending root of folded polynomial (degree {:?}) to transcript.",
             polynomial.degree()
         );
+        // if layer == 1 {
+        // //     println!("{:?}", domain_size);
+        // //     println!("{}", offset.representative());
+        // //     println!("{:?}", query_indices[0] % domain_size);
+        //     // for i in 0..5 {
+        //     //     println!("{:?}", eval[query_indices[i] % domain_size]);
+        //     // }
+        // }
 
         // append layer
         fri_layers.push(
@@ -104,6 +115,92 @@ pub fn commit_and_fold<F>(
     }
 
     fri_layers
+}
+
+pub fn decommit_and_fold<F>(
+        layers: &Vec<FriLayer<F>>,
+        domain_size: &usize,
+        offset: &FieldElement<F>,
+        query_indices: &Vec<usize>,
+        queries: &Vec<FieldElement<F>>,
+        query_evals: &Vec<FieldElement<F>>,
+        transcript: &mut DefaultTranscript<F>
+    ) -> bool
+    where
+        F: IsField + IsFFTField,
+        FieldElement<F>: AsBytes + ByteConversion + Sync + Send {
+
+    let mut domain_size = domain_size.clone();
+    let mut offset = offset.clone();
+    let mut query_indices = query_indices.clone();
+    let mut queries = queries.clone();
+    let mut query_evals = query_evals.clone();
+    let mut sym_evals = Vec::<FieldElement<F>>::with_capacity(query_evals.len());
+    let number_of_foldings = 11;
+
+    // commit to evaluations
+    // let (eval, tree) = commit(&polynomial, domain_size, &offset);
+    let FriLayer{root, validation_data} = &layers[0];
+    transcript.append_bytes(root);
+    println!("Layer 0: \n \t Appending root of composition polynomial to transcript.");
+
+    // verify first layer inclusion proofs and get next layer queries
+    // println!("{:?}", query_indices);
+    let num_queries = query_indices.len();
+    for i in 0..num_queries {
+        let idx = query_indices[i];
+        let sym_idx = (idx + domain_size / 2) % domain_size;
+        let eval = &query_evals[i];
+        let ValidationData{proof, sym_eval, sym_proof} = &validation_data[i];
+        sym_evals.push(sym_eval.clone());
+
+        if !proof.verify::<Keccak256Backend<F>>(root, idx, eval) || !sym_proof.verify::<Keccak256Backend<F>>(root, sym_idx, sym_eval) {
+            println!("Verification of first layer inclusion proofs did not pass");
+            return false            
+        }
+    };
+    // println!("{:?}", query_indices);
+
+    // recursive foldings
+    for (k, layer) in layers.iter().enumerate().skip(1) {
+        let beta = transcript.sample_field_element();
+        println!("Layer {:?}:", k);
+        println!("\t beta: {:?}", beta);
+
+
+        domain_size /= 2;
+        // println!("{:?}", domain_size);
+        
+        let FriLayer{root, validation_data} = layer;
+        transcript.append_bytes(root);
+        println!("\t Appending root of folded polynomial to transcript.");
+
+
+
+        for i in 0..num_queries {
+            println!("{:?}", query_indices[i]);
+            // query_indices[i] = query_indices[i] % domain_size;
+            // println!("{:?}", query_indices[0]);
+            query_evals[i] = curr_layer_query_evals(&queries[i], &query_evals[i], &sym_evals[i], &beta);
+            queries[i] = queries[i].square();
+            // println!("{:?}", queries[0]);
+            // println!("{:?}", query_evals[i]);
+        
+
+            let idx = query_indices[i] % domain_size;
+            let sym_idx = (idx + domain_size / 2) % domain_size;
+            let eval = &query_evals[i];
+            let ValidationData{proof, sym_eval, sym_proof} = &validation_data[i];
+            sym_evals[i] = sym_eval.clone();
+
+            if !proof.verify::<Keccak256Backend<F>>(root, idx, eval) || !sym_proof.verify::<Keccak256Backend<F>>(root, sym_idx, sym_eval) {
+                println!("\t Verification of layer inclusion proofs for query {:?} did not pass", i);
+                return false            
+            }
+        }
+    };
+
+    true
 }
 
 fn commit<F>(
@@ -136,4 +233,15 @@ fn fold<F: IsField>(
     (poly::fold_polynomial(&polynomial, &beta),
     domain_size / 2,
     offset.square())
+}
+
+pub fn curr_layer_query_evals<F: IsField>(
+        query: &FieldElement<F>,
+        eval: &FieldElement<F>,
+        sym_eval: &FieldElement<F>,
+        beta: &FieldElement<F>,
+    ) -> FieldElement<F> {
+    let query_inv = query.inv().unwrap();
+    let two_inv = FieldElement::<F>::from(2_u64).inv().unwrap();
+    ((eval + sym_eval) + beta * (eval - sym_eval) * query_inv) * two_inv
 }

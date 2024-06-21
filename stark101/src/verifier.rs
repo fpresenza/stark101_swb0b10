@@ -111,12 +111,18 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
         return false
     }
 
+    // compute queries
+    let queries = query_indices
+        .iter()
+        .map(|idx| offset * w.pow(idx.to_owned()))
+        .collect::<Vec<FE>>();
+
     // compute composition polynomial evaluations
-    let comp_poly_query_evals = query_indices
+    let comp_poly_query_evals = queries
         .iter()
         .enumerate()
-        .map(|(i, idx)| {
-            let x0 = offset * w.pow(idx.to_owned());
+        .map(|(i, x0)| {
+            // let x0 = offset * w.pow(idx.to_owned());
             let t = (0..aux_indices_len).map(|k| {
                 trace_poly_proofs[aux_indices_len * i + k].0
             }).collect::<Vec<FE>>();
@@ -135,8 +141,16 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
 
     // ===================================
     // =========|    Part 3:   |==========
-    // ========= FRI Decommitment ==========
+    // ======== FRI Decommitment =========
     // ===================================
-
-    true
+    // build fri layers
+    fri::decommit_and_fold(
+        &fri_layers,
+        &eval_dom_size,
+        &offset,
+        &query_indices,
+        &queries,
+        &comp_poly_query_evals,
+        &mut transcript
+    )
 }
