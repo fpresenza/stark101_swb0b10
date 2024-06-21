@@ -11,6 +11,7 @@ mod poly;
 mod common;
 mod fri;
 mod prover;
+mod verifier;
 
 // the stark252 field has 2-adicity of 192, i.e., the largest
 // multiplicative subgroup whose order is a power of two has order 2^192
@@ -45,5 +46,11 @@ fn main() {
         fib_squared_1022,
     );
 
-    prover::generate_proof(public_input.clone());
+    let proof = prover::generate_proof(public_input.clone());
+    let valid_proof = verifier::verify_proof(public_input.clone(), proof);
+    if valid_proof {
+        println!("Proof has been successfully verified.");
+    } else {
+        println!("Proof is invalid.");
+    }
 }
