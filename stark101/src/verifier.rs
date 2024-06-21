@@ -122,7 +122,6 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
         .iter()
         .enumerate()
         .map(|(i, x0)| {
-            // let x0 = offset * w.pow(idx.to_owned());
             let t = (0..aux_indices_len).map(|k| {
                 trace_poly_proofs[aux_indices_len * i + k].0
             }).collect::<Vec<FE>>();
@@ -137,8 +136,6 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
             )
         }).collect::<Vec<FE>>();
 
-    // println!("{:?}", comp_poly_query_evals[2]);
-
     // ===================================
     // =========|    Part 3:   |==========
     // ======== FRI Decommitment =========
@@ -147,7 +144,6 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
     fri::decommit_and_fold(
         &fri_layers,
         &eval_dom_size,
-        &offset,
         &query_indices,
         &queries,
         &comp_poly_query_evals,

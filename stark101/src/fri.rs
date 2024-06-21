@@ -76,7 +76,7 @@ pub fn commit_and_fold<F>(
     for k in 1..=number_of_foldings {
         let beta = transcript.sample_field_element();
         println!("Layer {:?}:", k);
-        println!("\t beta: {:?}", beta);
+        println!("\t Sampling beta");
 
         (polynomial, domain_size, offset) = fold(polynomial, domain_size, offset, beta);
 
@@ -86,14 +86,6 @@ pub fn commit_and_fold<F>(
             "\t Appending root of folded polynomial (degree {:?}) to transcript.",
             polynomial.degree()
         );
-        // if layer == 1 {
-        // //     println!("{:?}", domain_size);
-        // //     println!("{}", offset.representative());
-        // //     println!("{:?}", query_indices[0] % domain_size);
-        //     // for i in 0..5 {
-        //     //     println!("{:?}", eval[query_indices[i] % domain_size]);
-        //     // }
-        // }
 
         // append layer
         fri_layers.push(
@@ -120,7 +112,6 @@ pub fn commit_and_fold<F>(
 pub fn decommit_and_fold<F>(
         layers: &Vec<FriLayer<F>>,
         domain_size: &usize,
-        offset: &FieldElement<F>,
         query_indices: &Vec<usize>,
         queries: &Vec<FieldElement<F>>,
         query_evals: &Vec<FieldElement<F>>,
@@ -131,21 +122,17 @@ pub fn decommit_and_fold<F>(
         FieldElement<F>: AsBytes + ByteConversion + Sync + Send {
 
     let mut domain_size = domain_size.clone();
-    let mut offset = offset.clone();
-    let mut query_indices = query_indices.clone();
+    let query_indices = query_indices.clone();
     let mut queries = queries.clone();
     let mut query_evals = query_evals.clone();
     let mut sym_evals = Vec::<FieldElement<F>>::with_capacity(query_evals.len());
-    let number_of_foldings = 11;
 
     // commit to evaluations
-    // let (eval, tree) = commit(&polynomial, domain_size, &offset);
     let FriLayer{root, validation_data} = &layers[0];
     transcript.append_bytes(root);
     println!("Layer 0: \n \t Appending root of composition polynomial to transcript.");
 
     // verify first layer inclusion proofs and get next layer queries
-    // println!("{:?}", query_indices);
     let num_queries = query_indices.len();
     for i in 0..num_queries {
         let idx = query_indices[i];
@@ -159,17 +146,14 @@ pub fn decommit_and_fold<F>(
             return false            
         }
     };
-    // println!("{:?}", query_indices);
 
     // recursive foldings
     for (k, layer) in layers.iter().enumerate().skip(1) {
         let beta = transcript.sample_field_element();
         println!("Layer {:?}:", k);
-        println!("\t beta: {:?}", beta);
-
-
+        println!("\t Sampling beta");
+        
         domain_size /= 2;
-        // println!("{:?}", domain_size);
         
         let FriLayer{root, validation_data} = layer;
         transcript.append_bytes(root);
@@ -178,14 +162,8 @@ pub fn decommit_and_fold<F>(
 
 
         for i in 0..num_queries {
-            println!("{:?}", query_indices[i]);
-            // query_indices[i] = query_indices[i] % domain_size;
-            // println!("{:?}", query_indices[0]);
             query_evals[i] = curr_layer_query_evals(&queries[i], &query_evals[i], &sym_evals[i], &beta);
             queries[i] = queries[i].square();
-            // println!("{:?}", queries[0]);
-            // println!("{:?}", query_evals[i]);
-        
 
             let idx = query_indices[i] % domain_size;
             let sym_idx = (idx + domain_size / 2) % domain_size;
