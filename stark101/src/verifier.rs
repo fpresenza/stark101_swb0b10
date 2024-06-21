@@ -51,9 +51,6 @@ pub fn verify_proof(public_input: PublicInput<F>, proof: StarkProof<F>) -> bool 
         fri_layers
     ) = proof;
 
-    // initialize result
-    let mut result = false;
-
     // initialize transcript and append all public inputs
     let mut transcript = DefaultTranscript::<F>::new(&[]);
     transcript.append_bytes(&modulus.to_bytes_be());
@@ -94,39 +91,39 @@ pub fn verify_proof(public_input: PublicInput<F>, proof: StarkProof<F>) -> bool 
     // println!("b = {:?}", b);
     // println!("c = {:?}", c);
 
+    // get queries evaluations and add to transcript
+    let query_indices = common::sample_queries(num_queries, eval_dom_size, &mut transcript);
+    println!("Sampling Query indices and appending to transcript: {:?}", query_indices);
+
+    // verify trace inclusion proofs
+    for (index, incl_proof) in query_indices.iter().zip(trace_poly_incl_proofs) {
+        let result = incl_proof
+            .iter()
+            .enumerate()
+            .map(|(k, InclusionProof(eval, proof))| {
+                proof.verify::<Keccak256Backend<F>>(
+                    &trace_poly_tree_root,
+                    (index + k) % eval_dom_size,
+                    &eval
+                )
+            })
+            .fold(true, |agg, res| {agg && res});
+        if !result {
+            println!("Verification of composition polynomial inclusion proofs did not pass");
+            return false
+        }
+    }
+
+    // verify composition polynomial inclusion proofs
+    
+
 
     // ===================================
     // =========|    Part 3:   |==========
     // ========= FRI Commitment ==========
     // ===================================
-    // get queries evaluations and add to transcript
-    let query_indices = common::sample_queries(num_queries, eval_dom_size, &mut transcript);
-    println!("Sampling Query indices and appending to transcript: {:?}", query_indices);
 
-    for i in 0..query_indices.len() {
-        let indices = [
-            query_indices[i],
-            (query_indices[i] + 1) % eval_dom_size,
-            (query_indices[i] + 2) % eval_dom_size
-        ];
-        let incl_proofs = &trace_poly_incl_proofs[i];
 
-        let incl_proofs_result = incl_proofs
-            .iter()
-            .zip(indices)
-            .map(|(InclusionProof(eval, proof), j)| {
-                proof.verify::<Keccak256Backend<F>>(
-                    &trace_poly_tree_root,
-                    j,
-                    &eval
-                )
-            })
-            .fold(true, |agg, res| {agg && res});
-        if !incl_proofs_result {
-            println!("Verification of composition polynomial inclusion proofs did not pass");
-            return false
-        }
-    }
 
     true
 }
