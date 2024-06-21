@@ -24,7 +24,7 @@ const INT_DOM_SIZE: usize = 0b10000000000;
 // evaluation domain of size 8192 = 2^13 (blow-up factor is 2^3)
 const EVAL_DOM_SIZE: usize = 0b10000000000000;
 // number of queries in FRI
-const NUM_QUERIES: usize = 5;
+const NUM_QUERIES: usize = 10;
 
 
 fn main() {
@@ -46,11 +46,22 @@ fn main() {
         fib_squared_1022,
     );
 
+    // generate valid proof
     let proof = prover::generate_proof(public_input.clone());
-    let valid_proof = verifier::verify_proof(public_input.clone(), proof);
-    if valid_proof {
-        println!("Proof has been successfully verified.");
+
+    // simulate invalid proof
+    let mut invalid_proof = proof.clone();
+    invalid_proof.0[0] += 1;
+
+    if verifier::verify_proof(public_input.clone(), proof) {
+        println!("Valid Proof: successfully verified.");
     } else {
-        println!("Proof is invalid.");
+        println!("Valid Proof: could not be verified.");
+    }
+
+    if verifier::verify_proof(public_input.clone(), invalid_proof) {
+        println!("Invalid Proof: successfully verified.");
+    } else {
+        println!("Invalid Proof: could not be verified.");
     }
 }
