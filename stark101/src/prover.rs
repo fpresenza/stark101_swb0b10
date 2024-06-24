@@ -61,17 +61,17 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     let g_to_the_1022 = g * g_to_the_1021;
     let g_to_the_1023 = g * g_to_the_1022;
 
-
     // create vec to hold fibonacci square sequence
     let mut fib_squared = Vec::<FE>::with_capacity(interp_order);
     fib_squared.push(fib_squared_0);
     fib_squared.push(witness);
 
-    for i in 2..interp_order {
+    for i in 2..interp_order-1 {
         let x = fib_squared[i-2];
         let y = fib_squared[i-1];
         fib_squared.push(x.square() + y.square());
     }
+    fib_squared.push(FE::zero());
 
     // fft-interpolate the fibonacci square sequence
     let trace_poly = match Polynomial::interpolate_fft::<F>(&fib_squared) {
