@@ -116,7 +116,7 @@ pub fn decommit_and_fold<F>(
     let mut domain_size = domain_size.to_owned();
     let mut queries = queries.to_owned();
     let mut query_evals = query_evals.to_owned();
-    let mut sym_evals = Vec::<FieldElement<F>>::with_capacity(query_evals.len());
+    let mut sym_evals = query_evals.clone();
 
     // commit to evaluations
     let FriLayer{root, validation_data} = &layers[0];
@@ -129,7 +129,7 @@ pub fn decommit_and_fold<F>(
         let sym_idx = (idx + domain_size / 2) % domain_size;
         let eval = &query_evals[i];
         let ValidationData{proof, sym_eval, sym_proof} = &validation_data[i];
-        sym_evals.push(sym_eval.clone());
+        sym_evals[i] = sym_eval.clone();
 
         if !proof.verify::<Keccak256Backend<F>>(root, idx, eval) || !sym_proof.verify::<Keccak256Backend<F>>(root, sym_idx, sym_eval) {
             return false            
