@@ -161,6 +161,11 @@ pub fn decommit_and_fold<F>(
         }
     };
 
+    // check if all queries to the last polynomial are equal
+    if !query_evals.iter().all(|q| q == query_evals.first().unwrap()) {
+        return false
+    }
+
     true
 }
 
