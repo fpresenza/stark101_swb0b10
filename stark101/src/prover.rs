@@ -90,6 +90,10 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     // commit to the trace evaluations over the larger domain using a merkle tree
     let trace_poly_tree = MerkleTree::<Keccak256Backend<F>>::build(&trace_poly_eval);
     transcript.append_bytes(&trace_poly_tree.root);
+    let mut trace_commitment = VectorCommitment::<F> {
+        root: trace_poly_tree.root,
+        inclusion_proofs: vec![]
+    };
 
     // ===================================
     // =========|    Part 2:   |==========
@@ -174,15 +178,15 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     }).collect::<Vec<Vec<usize>>>()
     .concat();
 
-    let trace_poly_incl_proofs = common::generate_inclusion_proofs(
+    trace_commitment.inclusion_proofs.extend(common::generate_inclusion_proofs(
         &all_indices,
         &trace_poly_eval,
         &trace_poly_tree,
-    );
-    let trace_commitment = VectorCommitment(trace_poly_tree.root, trace_poly_incl_proofs);
+    ));
+    // let trace_commitment = VectorCommitment(trace_poly_tree.root, trace_poly_incl_proofs);
     
     // build fri layers
-    let fri_layers = fri::commit_and_fold(
+    let composition_commitment = fri::commit_and_fold(
         &comp_poly,
         eval_order,
         &offset,
@@ -191,9 +195,9 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     );
 
 
-    StarkProof (
+    StarkProof {
         trace_commitment,
-        fri_layers
-    )
+        composition_commitment
+    }
 
 }

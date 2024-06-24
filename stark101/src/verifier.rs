@@ -33,13 +33,13 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
         fib_squared_1022
     ) = public_input;
 
-    let StarkProof(
-        VectorCommitment(
-            trace_poly_root,
-            trace_poly_proofs
-        ),
-        fri_layers
-    ) = stark_proof;
+    let StarkProof {
+        trace_commitment: VectorCommitment {
+            root: trace_poly_root,
+            inclusion_proofs: trace_poly_proofs
+        },
+        composition_commitment: fri_layers
+    } = stark_proof;
 
     // initialize transcript and append all public inputs
     let mut transcript = DefaultTranscript::<F>::new(&[]);

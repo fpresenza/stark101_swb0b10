@@ -32,16 +32,16 @@ pub struct InclusionProof<F: IsField> (
 );
 
 #[derive(Clone)]
-pub struct VectorCommitment<F: IsField> (
-	pub [u8; 32],
-	pub Vec<InclusionProof<F>>,
-);
+pub struct VectorCommitment<F: IsField> {
+	pub root: [u8; 32],
+	pub inclusion_proofs: Vec<InclusionProof<F>>
+}
 
 #[derive(Clone)]
-pub struct StarkProof<F: IsField> (
-	pub VectorCommitment<F>,
-	pub FriCommitment<F>
-);
+pub struct StarkProof<F: IsField> {
+	pub trace_commitment: VectorCommitment<F>,
+	pub composition_commitment: FriCommitment<F>
+}
 
 pub fn sample_queries<F>(
         num_queries: usize,
