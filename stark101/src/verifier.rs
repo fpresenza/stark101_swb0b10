@@ -63,6 +63,7 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
     let g_to_the_1023 = g * g_to_the_1022;
 
     let w = F::get_primitive_root_of_unity(eval_two_power as u64).unwrap();
+    assert_eq!(w.pow(8_u64), g);
 
     transcript.append_bytes(&trace_commitment.root);
 
