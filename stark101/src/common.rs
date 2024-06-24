@@ -84,7 +84,7 @@ impl<F> VectorCommitment<F>
                 proof.verify::<Keccak256Backend<F>>(
                     &self.root,
                     *index,
-                    &eval
+                    eval
                 )
             }).all(|valid| valid)
     }
