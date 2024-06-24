@@ -15,7 +15,7 @@ use lambdaworks_crypto::fiat_shamir::{
 };
 
 use crate::poly;
-use crate::common::{self, PublicInput, PolynomialCommitment, StarkProof};
+use crate::common::{self, PublicInput, VectorCommitment, StarkProof};
 use crate::fri;
 
 // the stark252 field has 2-adicity of 192, i.e., the largest
@@ -177,7 +177,7 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
         &trace_poly_eval,
         &trace_poly_tree,
     );
-    let trace_commitment = PolynomialCommitment(trace_poly_tree.root, trace_poly_incl_proofs);
+    let trace_commitment = VectorCommitment(trace_poly_tree.root, trace_poly_incl_proofs);
     
     // build fri layers
     let fri_layers = fri::commit_and_fold(

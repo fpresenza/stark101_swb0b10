@@ -9,7 +9,7 @@ use lambdaworks_crypto::fiat_shamir::{
     default_transcript::DefaultTranscript
 };
 
-use crate::common::{self, PublicInput, PolynomialCommitment, StarkProof};
+use crate::common::{self, PublicInput, VectorCommitment, StarkProof};
 use crate::fri;
 
 // the stark252 field has 2-adicity of 192, i.e., the largest
@@ -34,7 +34,7 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
     ) = public_input;
 
     let StarkProof(
-        PolynomialCommitment(
+        VectorCommitment(
             trace_poly_root,
             trace_poly_proofs
         ),
