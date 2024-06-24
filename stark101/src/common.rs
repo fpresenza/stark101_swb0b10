@@ -13,7 +13,7 @@ use lambdaworks_crypto::fiat_shamir::{
     default_transcript::DefaultTranscript
 };
 
-use crate::fri::FriLayer;
+use crate::fri::FriCommitment;
 
 #[derive(Clone)]
 pub struct PublicInput<F: IsField> (
@@ -40,7 +40,7 @@ pub struct VectorCommitment<F: IsField> (
 #[derive(Clone)]
 pub struct StarkProof<F: IsField> (
 	pub VectorCommitment<F>,
-	pub Vec<FriLayer<F>>
+	pub FriCommitment<F>
 );
 
 pub fn sample_queries<F>(

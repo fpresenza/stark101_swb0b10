@@ -17,6 +17,8 @@ use lambdaworks_crypto::fiat_shamir::{
 
 use crate::poly;
 
+pub type FriCommitment<F> = Vec<FriLayer<F>>;
+
 #[derive(Clone)]
 pub struct ValidationData<F: IsField> {
     pub proof: Proof<[u8; 32]>,
