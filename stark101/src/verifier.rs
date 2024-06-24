@@ -9,7 +9,7 @@ use lambdaworks_crypto::fiat_shamir::{
     default_transcript::DefaultTranscript
 };
 
-use crate::common::{self, PublicInput, VectorCommitment, StarkProof};
+use crate::common::{self, PublicInput, StarkProof};
 use crate::fri;
 
 // the stark252 field has 2-adicity of 192, i.e., the largest
@@ -34,11 +34,8 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
     ) = public_input;
 
     let StarkProof {
-        trace_commitment: VectorCommitment {
-            root: trace_poly_root,
-            inclusion_proofs: trace_poly_proofs
-        },
-        composition_commitment: fri_layers
+        trace_commitment,
+        composition_commitment
     } = stark_proof;
 
     // initialize transcript and append all public inputs
@@ -67,7 +64,7 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
 
     let w = F::get_primitive_root_of_unity(eval_two_power as u64).unwrap();
 
-    transcript.append_bytes(&trace_poly_root);
+    transcript.append_bytes(&trace_commitment.root);
 
     // ===================================
     // =========|    Part 2:   |==========
@@ -91,8 +88,7 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
     }).collect::<Vec<Vec<usize>>>()
     .concat();
 
-    // verify trace inclusion proofs
-    if !common::verify_inclusion_proofs(&all_indices, &trace_poly_proofs, trace_poly_root) {
+    if !trace_commitment.verify_inclusion_proofs(&all_indices) {
         return false
     }
 
@@ -108,7 +104,7 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
         .enumerate()
         .map(|(i, x0)| {
             let t = (0..aux_indices_len).map(|k| {
-                trace_poly_proofs[aux_indices_len * i + k].0
+                trace_commitment.inclusion_proofs[aux_indices_len * i + k].0
             }).collect::<Vec<FE>>();
             a * (t[0] - fib_squared_0) / (x0 - one) +
             b * (t[0] - fib_squared_1022) / (x0 - g_to_the_1022) +
@@ -127,7 +123,7 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
     // ===================================
     // build fri layers
     fri::decommit_and_fold(
-        &fri_layers,
+        &composition_commitment,
         &eval_order,
         &query_indices,
         &queries,
