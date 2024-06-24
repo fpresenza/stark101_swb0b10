@@ -61,9 +61,10 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
     let g_to_the_1021 = g.pow(1021_u64);
     let g_to_the_1022 = g * g_to_the_1021;
     let g_to_the_1023 = g * g_to_the_1022;
+    let blowup_factor = (2_usize).pow((eval_two_power - interp_two_power) as u32);
 
     let w = F::get_primitive_root_of_unity(eval_two_power as u64).unwrap();
-    assert_eq!(w.pow(8_u64), g);
+    assert_eq!(w.pow(blowup_factor as u64), g);
 
     transcript.append_bytes(&trace_commitment.root);
 
@@ -77,7 +78,7 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
 
     // get queries evaluations and add to transcript
     let query_indices = common::sample_queries(num_queries, eval_order, &mut transcript);
-    let aux_indices = [0_usize, 8, 16];
+    let aux_indices = [0, blowup_factor, 2 * blowup_factor];
     let aux_indices_len = aux_indices.len();
     let all_indices = query_indices
         .iter()

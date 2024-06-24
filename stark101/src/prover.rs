@@ -60,6 +60,7 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     let g_to_the_1021 = g.pow(1021_u64);
     let g_to_the_1022 = g * g_to_the_1021;
     let g_to_the_1023 = g * g_to_the_1022;
+    let blowup_factor = (2_usize).pow((eval_two_power - interp_two_power) as u32);
 
     // create vec to hold fibonacci square sequence
     let mut fib_squared = Vec::<FE>::with_capacity(interp_order);
@@ -164,7 +165,7 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     // ===================================
     // get queries evaluations and add to transcript
     let query_indices = common::sample_queries(num_queries, eval_order, &mut transcript);
-    let aux_indices = [0_usize, 8, 16];
+    let aux_indices = [0, blowup_factor, 2 * blowup_factor];
     let all_indices = query_indices
         .iter()
         .map(|i| {
