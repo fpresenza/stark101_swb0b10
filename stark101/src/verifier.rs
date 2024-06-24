@@ -26,8 +26,8 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
     // extract public input
     let PublicInput(
         modulus,
-        int_dom_size,
-        eval_dom_size,
+        interp_two_power,
+        eval_two_power,
         num_queries,
         fib_squared_0,
         fib_squared_1022
@@ -44,8 +44,8 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
     // initialize transcript and append all public inputs
     let mut transcript = DefaultTranscript::<F>::new(&[]);
     transcript.append_bytes(&modulus.to_bytes_be());
-    transcript.append_bytes(&int_dom_size.to_be_bytes());
-    transcript.append_bytes(&eval_dom_size.to_be_bytes());
+    transcript.append_bytes(&interp_two_power.to_be_bytes());
+    transcript.append_bytes(&eval_two_power.to_be_bytes());
     transcript.append_bytes(&num_queries.to_be_bytes());
     transcript.append_bytes(&fib_squared_0.to_bytes_be());
     transcript.append_bytes(&fib_squared_1022.to_bytes_be());
@@ -53,20 +53,19 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
     // define example parameters
     let one = FE::one();
     let offset = FE::from(2_u64); 
+    let eval_order: usize = 1 << eval_two_power;
 
     /*
         TODO: OFFSET IS PUBLIC INPUT
     */
 
     // define primitive root
-    let power_of_two = usize::BITS - int_dom_size.leading_zeros() - 1;
-    let g = F::get_primitive_root_of_unity(power_of_two as u64).unwrap();
+    let g = F::get_primitive_root_of_unity(interp_two_power as u64).unwrap();
     let g_to_the_1021 = g.pow(1021_u64);
     let g_to_the_1022 = g * g_to_the_1021;
     let g_to_the_1023 = g * g_to_the_1022;
 
-    let power_of_two = usize::BITS - eval_dom_size.leading_zeros() - 1;
-    let w = F::get_primitive_root_of_unity(power_of_two as u64).unwrap();
+    let w = F::get_primitive_root_of_unity(eval_two_power as u64).unwrap();
 
     transcript.append_bytes(&trace_poly_root);
 
@@ -79,7 +78,7 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
     let c = transcript.sample_field_element();
 
     // get queries evaluations and add to transcript
-    let query_indices = common::sample_queries(num_queries, eval_dom_size, &mut transcript);
+    let query_indices = common::sample_queries(num_queries, eval_order, &mut transcript);
     let aux_indices = [0_usize, 8, 16];
     let aux_indices_len = aux_indices.len();
     let all_indices = query_indices
@@ -87,7 +86,7 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
         .map(|i| {
             aux_indices
                 .iter()
-                .map(|j| (i + j) % eval_dom_size)
+                .map(|j| (i + j) % eval_order)
                 .collect::<Vec<usize>>()
     }).collect::<Vec<Vec<usize>>>()
     .concat();
@@ -129,7 +128,7 @@ pub fn verify_proof(public_input: PublicInput<F>, stark_proof: StarkProof<F>) ->
     // build fri layers
     fri::decommit_and_fold(
         &fri_layers,
-        &eval_dom_size,
+        &eval_order,
         &query_indices,
         &queries,
         &comp_poly_query_evals,

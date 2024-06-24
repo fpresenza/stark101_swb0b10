@@ -32,8 +32,8 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     // extract public input
     let PublicInput(
         modulus,
-        int_dom_size,
-        eval_dom_size,
+        interp_two_power,
+        eval_two_power,
         num_queries,
         fib_squared_0,
         fib_squared_1022
@@ -42,8 +42,8 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     // initialize transcript and append all public inputs
     let mut transcript = DefaultTranscript::<F>::new(&[]);
     transcript.append_bytes(&modulus.to_bytes_be());
-    transcript.append_bytes(&int_dom_size.to_be_bytes());
-    transcript.append_bytes(&eval_dom_size.to_be_bytes());
+    transcript.append_bytes(&interp_two_power.to_be_bytes());
+    transcript.append_bytes(&eval_two_power.to_be_bytes());
     transcript.append_bytes(&num_queries.to_be_bytes());
     transcript.append_bytes(&fib_squared_0.to_bytes_be());
     transcript.append_bytes(&fib_squared_1022.to_bytes_be());
@@ -51,21 +51,23 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     // define example parameters
     let one = FE::one();
     let witness = FE::from(3141592_u64);
+    let interp_order: usize = 1 << interp_two_power;
+    let eval_order: usize = 1 << eval_two_power;
+
 
     // define primitive root
-    let power_of_two = usize::BITS - int_dom_size.leading_zeros() - 1;
-    let g = F::get_primitive_root_of_unity(power_of_two as u64).unwrap();
+    let g = F::get_primitive_root_of_unity(interp_two_power as u64).unwrap();
     let g_to_the_1021 = g.pow(1021_u64);
     let g_to_the_1022 = g * g_to_the_1021;
     let g_to_the_1023 = g * g_to_the_1022;
 
 
     // create vec to hold fibonacci square sequence
-    let mut fib_squared = Vec::<FE>::with_capacity(int_dom_size);
+    let mut fib_squared = Vec::<FE>::with_capacity(interp_order);
     fib_squared.push(fib_squared_0);
     fib_squared.push(witness);
 
-    for i in 2..int_dom_size {
+    for i in 2..interp_order {
         let x = fib_squared[i-2];
         let y = fib_squared[i-1];
         fib_squared.push(x.square() + y.square());
@@ -82,7 +84,7 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     // the offset is obtained as an outside not in the interpolation domain
     let offset = FE::from(2_u64);
     let trace_poly_eval = Polynomial::evaluate_offset_fft::<F>(
-        &trace_poly, 1, Some(eval_dom_size), &offset
+        &trace_poly, 1, Some(eval_order), &offset
     ).unwrap();
 
     // commit to the trace evaluations over the larger domain using a merkle tree
@@ -94,13 +96,13 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     // ===== Polynomial Constraints ======
     // ===================================
     let x = Polynomial::new_monomial(one, 1);
-    let x_to_the_1024 = Polynomial::new_monomial(one, int_dom_size);
+    let x_to_the_1024 = Polynomial::new_monomial(one, interp_order);
 
     // initial element constraint
     let constraint_0_poly = poly::polynomial_division(
         &(&trace_poly - fib_squared_0),
         &(&x - one),
-        eval_dom_size,
+        eval_order,
         &offset
     );
 
@@ -108,7 +110,7 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     let constraint_1022_poly = poly::polynomial_division(
         &(&trace_poly - fib_squared_1022),
         &(&x - g_to_the_1022),
-        eval_dom_size,
+        eval_order,
         &offset
     );
 
@@ -119,13 +121,13 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     let trace_poly_squared = poly::polynomial_power(
         &trace_poly,
         2_u64,
-        eval_dom_size,
+        eval_order,
         &offset
     );
     let trace_poly_scaled_once_squared = poly::polynomial_power(
         &trace_poly_scaled_once,
         2_u64,
-        eval_dom_size,
+        eval_order,
         &offset
     );
 
@@ -136,7 +138,7 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
             &(&x - g_to_the_1022),
             &(&x - g_to_the_1023)
         ],
-        eval_dom_size,
+        eval_order,
         &offset
     );
     // denominator
@@ -145,7 +147,7 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     let transition_constraint_poly = poly::polynomial_division(
         &numerator,
         &denominator,
-        eval_dom_size,
+        eval_order,
         &offset
     );
 
@@ -160,14 +162,14 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     // ========= FRI Commitment ==========
     // ===================================
     // get queries evaluations and add to transcript
-    let query_indices = common::sample_queries(num_queries, eval_dom_size, &mut transcript);
+    let query_indices = common::sample_queries(num_queries, eval_order, &mut transcript);
     let aux_indices = [0_usize, 8, 16];
     let all_indices = query_indices
         .iter()
         .map(|i| {
             aux_indices
                 .iter()
-                .map(|j| (i + j) % eval_dom_size)
+                .map(|j| (i + j) % eval_order)
                 .collect::<Vec<usize>>()
     }).collect::<Vec<Vec<usize>>>()
     .concat();
@@ -182,7 +184,7 @@ pub fn generate_proof(public_input: PublicInput<F>) -> StarkProof<F> {
     // build fri layers
     let fri_layers = fri::commit_and_fold(
         &comp_poly,
-        eval_dom_size,
+        eval_order,
         &offset,
         query_indices,
         &mut transcript

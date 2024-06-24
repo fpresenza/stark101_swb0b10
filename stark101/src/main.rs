@@ -20,9 +20,9 @@ type FConfig = MontgomeryConfigStark252PrimeField;
 type FE = FieldElement<F>;
 
 // interpolation domain of size 1024 = 2^10
-const INT_DOM_SIZE: usize = 0b10000000000;
+const INTERP_TWO_POWER: usize = 10;
 // evaluation domain of size 8192 = 2^13 (blow-up factor is 2^3)
-const EVAL_DOM_SIZE: usize = 0b10000000000000;
+const EVAL_TWO_POWER: usize = 13;
 // number of queries in FRI
 const NUM_QUERIES: usize = 10;
 
@@ -39,8 +39,8 @@ fn main() {
 
     let public_input = common::PublicInput(
         modulus,
-        INT_DOM_SIZE,
-        EVAL_DOM_SIZE,
+        INTERP_TWO_POWER,
+        EVAL_TWO_POWER,
         NUM_QUERIES,
         fib_squared_0,
         fib_squared_1022,
